@@ -142,7 +142,7 @@ def train():
 
         # ==================== 在验证集上统计指标 ====================
         transformer.eval()
-        lr, valid_acc, valid_loss, valid_performances, valid_ppl = valid_epoch(device, epoch_i, lr, opt, scheduler,
+        valid_acc, valid_loss, valid_performances, valid_ppl = valid_epoch(device, epoch_i, lr, opt,
                                                                                transformer, valid_dataloader)
 
         # ==================== 根据不同的保存策略保存模型 ====================
@@ -202,7 +202,7 @@ def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total
     return correct, running_loss, step, total_words
 
 
-def valid_epoch(device, epoch_i, lr, opt, scheduler, transformer, valid_dataloader):
+def valid_epoch(device, epoch_i, lr, opt, transformer, valid_dataloader):
     with torch.no_grad():
         start_valid_time = time.time()
         desc = '    - (Validating)    '
@@ -225,11 +225,10 @@ def valid_epoch(device, epoch_i, lr, opt, scheduler, transformer, valid_dataload
         valid_loss = running_loss / step
         valid_ppl = np.exp(min(valid_loss, 100))
         valid_duration = time.time() - start_valid_time
-        lr = scheduler.get_lr()
         valid_performances = performance_str('Validating', epoch_i, opt.epoch, valid_loss, valid_ppl, valid_acc,
                                              lr, valid_duration)
         print(valid_performances)
-    return lr, valid_acc, valid_loss, valid_performances, valid_ppl
+    return valid_acc, valid_loss, valid_performances, valid_ppl
 
 
 def cal_loss(opt, pred, trg):
