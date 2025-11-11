@@ -19,7 +19,7 @@ git clone https://www.modelscope.cn/datasets/iic/WMT-Chinese-to-English-Machine-
 
 ## 1) 数据预处理
 ```bash
-python python preprocess.py -data_dir data -save_data preprocess_data.pkl -max_seq_len 100 -sample_size 1e6 -vocab_range train -vocab_min_freq 3
+python preprocess.py -data_dir data -save_data preprocess_data.pkl -max_seq_len 100 -sample_size 1e6 -vocab_range train -vocab_min_freq 3
 ```
 
 ## 2) 模型训练
