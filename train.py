@@ -188,6 +188,10 @@ def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total
         cur_correct, loss, valid_words_num = cal_loss(opt, pred, trg)
         scheduler.zero_grad()
         loss.backward()
+
+        # 梯度裁剪
+        torch.nn.utils.clip_grad_norm_(transformer.parameters(), max_norm=5)
+
         scheduler.update_and_step()
         print('[Info] Finish backward computing...')
         # 指标统计
