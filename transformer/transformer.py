@@ -32,7 +32,8 @@ class Transformer(nn.Module):
             nn.Linear(word_vec, trg_vocab_size),
             nn.Softmax(dim=-1)
         )
-        self.dropout = nn.Dropout(dropout)
+        self.src_dropout = nn.Dropout(dropout)
+        self.trg_dropout = nn.Dropout(dropout)
 
         self.src_pad_idx = src_pad_idx
         self.trg_pad_idx = trg_pad_idx
@@ -55,8 +56,8 @@ class Transformer(nn.Module):
         trg_seq_input = self.decoder_embedding(trg_seq) + self.position_encoder.position_codes
 
         # 添加必要的dropout
-        src_seq_input = self.dropout(src_seq_input)
-        trg_seq_input = self.dropout(trg_seq_input)
+        src_seq_input = self.src_dropout(src_seq_input)
+        trg_seq_input = self.trg_dropout(trg_seq_input)
 
         # todo: 考虑是否需要在dropout外面再加一层 layer_norm
 
