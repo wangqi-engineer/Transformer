@@ -29,12 +29,14 @@ def main():
 
     # ==================== 加载模型 ====================
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    transformer = ModelLoader(opt.model_dir).load_exist_model()
+    checkpoint = torch.load(opt.model_dir)
+    settings = checkpoint['settings']
+    transformer = ModelLoader(checkpoint).load_exist_model()
     transformer.to(device)
 
     # ==================== 加载验证数据集 ====================
     # 读取文件中的数据集并tokenizer为张量
-    data = pickle.load(open(opt.data_pkl, 'rb'))
+    data = pickle.load(open(settings.data_pkl, 'rb'))
     print(f'[Info] Start to tokenize test data. Please waiting soon...')
     start = time.time()
     tokenizer = Tokenizer(data['vocab'])

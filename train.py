@@ -108,7 +108,8 @@ def train():
         )
     else:
         # 如果模型路径不为空，则加载该模型并继续训练
-        transformer = ModelLoader(opt.model_dir).load_exist_model()
+        checkpoint = torch.load(opt.model_dir)
+        transformer = ModelLoader(checkpoint).load_exist_model()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     transformer.to(device)

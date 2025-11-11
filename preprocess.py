@@ -47,7 +47,8 @@ class DataPreprocessor:
         # 最大序列长度包含起始词和结束词，因此原始句子的最大序列长度为 max_seq_len 减去2
         words_max_len = self.max_seq_len - 2
         if words_num > words_max_len:
-            sentence = words[:words_max_len]
+            sentence_clip = words[:words_max_len]
+            sentence = " ".join(sentence_clip)
 
         # ==================== 添加起始词，结束词和填充词 ====================
         new_sentence = " ".join([BOS_WORD, sentence, EOS_WORD])

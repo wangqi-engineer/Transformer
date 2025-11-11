@@ -57,12 +57,11 @@ class Tokenizer:
 
 class ModelLoader:
     """ Transformer模型加载器 """
-    def __init__(self, model_dir):
-        self.model_dir = model_dir
+    def __init__(self, checkpoint):
+        self.checkpoint = checkpoint
 
     def load_exist_model(self):
-        checkpoint = torch.load(self.model_dir)
-        settings = checkpoint['settings']
+        settings = self.checkpoint['settings']
 
         transformer = Transformer(
             layer_num=settings.layer_num,
@@ -76,5 +75,5 @@ class ModelLoader:
             trg_pad_idx=settings.trg_pad_idx,
             dropout=settings.dropout
         )
-        transformer.load_state_dict(checkpoint['params'])
+        transformer.load_state_dict(self.checkpoint['params'])
         return transformer
