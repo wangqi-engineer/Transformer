@@ -3,11 +3,19 @@
 
 # 使用方法
 
-## 数据集：WMT-Chinese-to-English-Machine-Translation-Training-Corpus
+## WMT-Chinese-to-English-Machine-Translation-Training-Corpus
 
-数据集源自世界翻译大会WMT 2021新闻翻译任务，整合了ParaCrawl、News-Commentary、Wiki-Titles、UN Parallel Corpus、WikiMatrix、CCMT等多个数据集，总计包含2500万对双语句子。
+## 0) 下载数据集
+
+数据集（WMT-Chinese-to-English-Machine-Translation-Training-Corpus）源自世界翻译大会WMT 2021新闻翻译任务，整合了ParaCrawl、News-Commentary、Wiki-Titles、UN Parallel Corpus、WikiMatrix、CCMT等多个数据集，总计包含2500万对双语句子。
 (http://www.statmt.org/wmt16/multimodal-task.html).
 
+**将下载好的数据集放在和preprocess.py平级的data文件夹内**
+
+```bash
+# git lfs install
+git clone https://www.modelscope.cn/datasets/iic/WMT-Chinese-to-English-Machine-Translation-Training-Corpus.git
+```
 
 ## 1) 数据预处理
 ```bash

@@ -111,15 +111,6 @@ class DataPreprocessor:
             print(f'[Info] Save vocabulary and data finished')
 
 
-    def download_raw_dataset(self):
-        from modelscope.msdatasets import MsDataset
-        MsDataset.load('iic/WMT-Chinese-to-English-Machine-Translation-Training-Corpus',
-                       subset_name='default',
-                       split='train',
-                       cache_dir=self.data_dir)
-        print('[Info] Download dataset success')
-
-
 def main():
     """
     准备数据集，做好词汇表，完成数据集划分，特殊词处理等数据清洗工作
@@ -143,11 +134,6 @@ def main():
         os.mkdir(opt.data_dir)
 
     data_preprocessor = DataPreprocessor(opt.data_dir, opt.max_seq_len)
-    # ==================== 下载数据集 ====================
-    # 如果数据集文件为空则通过sdk下载
-    if not os.listdir(opt.data_dir):
-        data_preprocessor.download_raw_dataset()
-
     # ==================== 数据预处理并通过文件保存 ====================
     data_preprocessor.load_raw_file2_pickle_file(opt)
     print('[Info] Preprocess dataset finish')
