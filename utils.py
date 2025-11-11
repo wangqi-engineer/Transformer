@@ -34,7 +34,7 @@ class Tokenizer:
         trg_list = []
         desc = '    - (Tokenizing) '
         # 先统一处理为dict再一次转tensor，提升性能
-        for sentence in tqdm(data, desc=desc, mininterval=2, leave=True):
+        for sentence in tqdm(data, desc=desc, mininterval=2, leave=False):
             src_sentence = self._sentence_tokenize(sentence['src'], self.vocab_s2i['src'])
             trg_sentence = self._sentence_tokenize(sentence['trg'], self.vocab_s2i['trg'])
             src_list.append(src_sentence)

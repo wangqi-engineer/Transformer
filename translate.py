@@ -52,7 +52,7 @@ def main():
 
     # ==================== 将翻译的原文本和目标文本写入文件 ====================
     desc = '    - (Translating) '
-    for src, trg in tqdm(test_dataloader, desc=desc, mininterval=2, leave=True):
+    for src, trg in tqdm(test_dataloader, desc=desc, mininterval=2, leave=False):
         src.to(device)
         trg.to(device)
         pred = transformer(src, trg)

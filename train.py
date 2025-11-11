@@ -175,7 +175,7 @@ def train():
 
 
 def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total_words, train_dataloader, transformer):
-    for src, trg in tqdm(train_dataloader, desc=desc, mininterval=2, leave=True):
+    for src, trg in tqdm(train_dataloader, desc=desc, mininterval=2, leave=False):
         # 前向计算
         print('[Info] Start forward computing...')
         src.to(device)
@@ -210,7 +210,7 @@ def valid_epoch(device, epoch_i, lr, opt, transformer, valid_dataloader):
         correct = 0
         step = 0
         total_words = 0
-        for src, trg in tqdm(valid_dataloader, desc=desc, mininterval=2, leave=True):
+        for src, trg in tqdm(valid_dataloader, desc=desc, mininterval=2, leave=False):
             # 前向计算
             src.to(device)
             trg.to(device)
