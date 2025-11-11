@@ -59,8 +59,6 @@ class Transformer(nn.Module):
         src_seq_input = self.src_dropout(src_seq_input)
         trg_seq_input = self.trg_dropout(trg_seq_input)
 
-        # todo: 考虑是否需要在dropout外面再加一层 layer_norm
-
         # ==================== 编码器处理 ====================
         for encoder_layer in self.encoder:
             src_seq_input = encoder_layer(src_seq_input, src_pad_mask)

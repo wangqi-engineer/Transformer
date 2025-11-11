@@ -34,10 +34,18 @@ class MultiHeadAttention(nn.Module):
         :param output_dec: 自注意力和掩码注意力时output_dec默认为None, 交叉注意力时表示输入来自解码器
         :return: 多头注意力输出
         """
-        concat_output = torch.tensor([])
-        # todo: 串行执行效率太低！考虑在原始张量中添加一次维度加速执行！
+        # 通过预定义tensor的大小并循环赋值的方式实现对多头注意力的concat
+        concat_output = torch.zeros_like(x)
         for idx, self_attention in enumerate(self.self_attentions):
-            head_i_output = self_attention(x, pad_mask=pad_mask) if self.attention_type != CROSS_ATTENTION_TYPE else self_attention(x, input_dec=output_dec, pad_mask=pad_mask)
-            concat_output = torch.concat((concat_output, head_i_output), dim=-1)
+            if self.attention_type != CROSS_ATTENTION_TYPE:
+                head_i_output = self_attention(x, pad_mask=pad_mask)
+            else:
+                head_i_output = self_attention(x, input_dec=output_dec, pad_mask=pad_mask)
+            head_dim = head_i_output.size(-1)
+            start_idx = idx * head_dim
+            end_idx = (idx + 1) * head_dim
+            # 避免在循环中使用torch.concat或者cat，效率太低且消耗大量内存
+            # 这样拼接的前提是每个头的维度是一样的
+            concat_output[:, :, start_idx:end_idx] = head_i_output
         output = self.w_o(concat_output)
         return output
