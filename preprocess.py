@@ -121,6 +121,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-data_dir', default='data')
     parser.add_argument('-save_data', default='preprocess_data.pkl')
+    # todo: 考虑是否根据数据集分别为 src 和 trg 设立动态的最大序列长度
     parser.add_argument('-max_seq_len', type=int, default=100)
     parser.add_argument('-sample_size', type=int, default=1e6)
 
