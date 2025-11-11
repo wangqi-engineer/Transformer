@@ -1,11 +1,13 @@
-""" 将单词映射为id并转为tensor """
+""" 工具类 """
 import torch
 from tqdm import tqdm
 
 from constants import UNK_WORD, BOS_WORD, EOS_WORD, PAD_WORD
+from transformer.transformer import Transformer
 
 
 class Tokenizer:
+    """ 将单词映射为id并转为tensor """
     def __init__(self, vocab):
         # 构建单词和索引的dict双向映射，通过dict加速查询速度
         self.vocab_s2i = {'src': {}, 'trg': {}}
@@ -52,3 +54,27 @@ class Tokenizer:
         for special_word in special_words:
             sentence.replace(special_word, '')
         return sentence
+
+class ModelLoader:
+    """ Transformer模型加载器 """
+    def __init__(self, model_dir):
+        self.model_dir = model_dir
+
+    def load_exist_model(self):
+        checkpoint = torch.load(self.model_dir)
+        settings = checkpoint['settings']
+
+        transformer = Transformer(
+            layer_num=settings.layer_num,
+            head_num=settings.head_num,
+            word_vec=settings.word_vec,
+            d_ff=settings.d_ff,
+            src_vocab_size=settings.src_vocab_size,
+            trg_vocab_size=settings.trg_vocab_size,
+            max_seq_size=settings.max_seq_len,
+            src_pad_idx=settings.src_pad_idx,
+            trg_pad_idx=settings.trg_pad_idx,
+            dropout=settings.dropout
+        )
+        transformer.load_state_dict(checkpoint['params'])
+        return transformer

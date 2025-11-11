@@ -106,7 +106,7 @@ class DataPreprocessor:
                 'valid': valid_data,
                 'test': test_data
             }
-            pickle.dump(data, open(opt.save_data, 'wb'))
+            pickle.dump(data, open(os.path.join(opt.data_dir, opt.save_data), 'wb'))
             print(f'[Info] Save vocabulary and data finished')
 
 

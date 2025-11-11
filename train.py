@@ -14,7 +14,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from transformer.lr_scheduler import LRScheduler
-from utils import Tokenizer
+from utils import Tokenizer, ModelLoader
 from constants import PAD_WORD
 from transformer.transformer import Transformer
 
@@ -30,7 +30,8 @@ def train():
     parser.add_argument('-b', '--batch_size', type=int, default=128)
     parser.add_argument('-epoch', type=int, default=100)
     parser.add_argument('-output_dir', default='outputs/train')
-    parser.add_argument('-data_pkl', default='preprocess_data.pkl')
+    parser.add_argument('-data_pkl', default='data/preprocess_data.pkl')
+    parser.add_argument('-model_dir', default='')
 
     parser.add_argument('-layer_num', type=int, default=6)
     parser.add_argument('-head_num', type=int, default=8)
@@ -47,6 +48,10 @@ def train():
 
     if not os.path.exists(opt.output_dir):
         os.makedirs(opt.output_dir, exist_ok=True)
+
+    if opt.model_dir and not os.path.exists(opt.model_dir):
+        # 如果要训练一个已经加载一半的模型但是路径不存在，则报错
+        raise ValueError(f'param model_dir:{opt.model_dir} does not exist')
 
     # ==================== 加载训练和验证数据集 ====================
     # 读取pkl文件中的数据集
@@ -87,19 +92,25 @@ def train():
     valid_dataloader = DataLoader(dataset=valid_dataset, batch_size=opt.batch_size, shuffle=True)
 
     # ==================== 初始化模型，学习率优化器等 ====================
+    if not opt.model_dir:
+        # 如果模型路径为空，则重头开始训练模型
+        transformer = Transformer(
+            layer_num=opt.layer_num,
+            head_num=opt.head_num,
+            word_vec=opt.word_vec,
+            d_ff=opt.d_ff,
+            src_vocab_size=opt.src_vocab_size,
+            trg_vocab_size=opt.trg_vocab_size,
+            max_seq_size=opt.max_seq_len,
+            src_pad_idx=opt.src_pad_idx,
+            trg_pad_idx=opt.trg_pad_idx,
+            dropout=opt.dropout
+        )
+    else:
+        # 如果模型路径不为空，则加载该模型并继续训练
+        transformer = ModelLoader(opt.model_dir).load_exist_model()
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    transformer = Transformer(
-        layer_num=opt.layer_num,
-        head_num=opt.head_num,
-        word_vec=opt.word_vec,
-        d_ff=opt.d_ff,
-        src_vocab_size=opt.src_vocab_size,
-        trg_vocab_size=opt.trg_vocab_size,
-        max_seq_size=opt.max_seq_len,
-        src_pad_idx=opt.src_pad_idx,
-        trg_pad_idx=opt.trg_pad_idx,
-        dropout=opt.dropout
-    )
     transformer.to(device)
     optimizer = optim.Adam(transformer.parameters(), lr=opt.lr, betas=(0.9, 0.98), eps=1e-9)
     scheduler = LRScheduler(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec)
@@ -123,6 +134,8 @@ def train():
         train_ppl = np.exp(min(train_loss, 100))
         train_duration = time.time() - start_train_time
         lr = scheduler.get_lr()
+        # 将当前学习率记录到settings中，方便继续学习训练该模型
+        opt.lr = lr
         train_performances = performance_str('Training', epoch_i, opt.epoch, train_loss, train_ppl, train_acc, lr, train_duration)
         print(train_performances)
 

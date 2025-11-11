@@ -9,8 +9,7 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
-from transformer.transformer import Transformer
-from utils import Tokenizer
+from utils import Tokenizer, ModelLoader
 
 
 def main():
@@ -30,32 +29,7 @@ def main():
 
     # ==================== 加载模型 ====================
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    checkpoint = torch.load(opt.model_dir)
-    settings = checkpoint['settings']
-
-    opt.layer_num = settings.layer_num
-    opt.head_num = settings.head_num
-    opt.word_vec = settings.word_vec
-    opt.d_ff = settings.d_ff
-    opt.src_vocab_size = settings.src_vocab_size
-    opt.trg_vocab_size = settings.trg_vocab_size
-    opt.max_seq_len = settings.max_seq_len
-    opt.src_pad_idx = settings.src_pad_idx
-    opt.trg_pad_idx = settings.trg_pad_idx
-    opt.data_pkl = settings.data_pkl
-
-    transformer = Transformer(
-        layer_num=opt.layer_num,
-        head_num=opt.head_num,
-        word_vec=opt.word_vec,
-        d_ff=opt.d_ff,
-        src_vocab_size=opt.src_vocab_size,
-        trg_vocab_size=opt.trg_vocab_size,
-        max_seq_size=opt.max_seq_len,
-        src_pad_idx=opt.src_pad_idx,
-        trg_pad_idx=opt.trg_pad_idx
-    )
-    transformer.load_state_dict(checkpoint['params'])
+    transformer = ModelLoader(opt.model_dir).load_exist_model()
     transformer.to(device)
 
     # ==================== 加载验证数据集 ====================
