@@ -49,11 +49,11 @@ class Attention(nn.Module):
 
         # ==================== softmax归一化 ====================
         # 如果时pad词则加上一个很小的数，softmax会给该pad词分配的权重很小，避免噪声干扰
-        s_scaled += + (-1e-9) * pad_mask.unsqueeze(1)
+        s_scaled = s_scaled.masked_fill(pad_mask, -1e9)
 
         # 如果是掩码注意力需要加上一个上三角矩阵
         if self.attention_type == MASKED_ATTENTION_TYPE:
-            m = torch.triu(torch.full_like(s_scaled, -torch.inf), diagonal=1)
+            m = torch.triu(torch.full_like(s_scaled, -1e9), diagonal=1)
             s_scaled += m
         scores = torch.softmax(s_scaled, dim=-1)
 
