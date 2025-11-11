@@ -26,7 +26,7 @@ class EncoderLayer(nn.Module):
             nn.Linear(d_ff, word_vec)
         )
         self.norms = nn.ModuleList([LayerNorm(word_vec) for _ in range(2)])
-        self.dropout = nn.Dropout(dropout)
+        self.dropouts = nn.ModuleList(nn.Dropout(dropout) for _ in range(2))
 
 
     def forward(self, x, pad_mask):
@@ -39,20 +39,20 @@ class EncoderLayer(nn.Module):
         """
         # ==================== 多头自注意力机制 ====================
         # pre-ln，在一开始就进行layer_norm
-        x = self.norms[0](x)
-        attentions_output = self.self_attentions(x, pad_mask=pad_mask)
-        attentions_output = self.dropout(attentions_output)
+        layer_norm_x = self.norms[0](x)
+        attentions_output = self.self_attentions(layer_norm_x, pad_mask=pad_mask)
+        attentions_output = self.dropouts[0](attentions_output)
 
         # ==================== 残差连接 ====================
-        norm_output = attentions_output + x
+        residual_add = attentions_output + x
 
         # ==================== feed_forward层 ====================
-        norm_output = self.norms[1](norm_output)
+        norm_output = self.norms[1](residual_add)
         feed_forward_output = self.feed_forward(norm_output)
-        feed_forward_output = self.dropout(feed_forward_output)
+        feed_forward_output = self.dropouts[1](feed_forward_output)
 
         # ==================== 残差连接 ====================
-        output = feed_forward_output + norm_output
+        output = feed_forward_output + residual_add
         return output
 
 
@@ -77,7 +77,7 @@ class DecoderLayer(nn.Module):
             nn.Linear(d_ff, word_vec)
         )
         self.norms = nn.ModuleList([LayerNorm(word_vec) for _ in range(3)])
-        self.dropout = nn.Dropout(dropout)
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout) for _ in range(3)])
 
     def forward(self, input_enc, input_dec, src_pad_mask, trg_pad_mask):
         """
@@ -91,26 +91,26 @@ class DecoderLayer(nn.Module):
         """
         # ==================== 多头掩码注意力机制 ====================
         # pre-ln，在一开始就进行layer_norm
-        input_dec = self.norms[0](input_dec)
-        output_masked_attention = self.masked_attentions(input_dec, pad_mask=trg_pad_mask)
-        output_masked_attention = self.dropout(output_masked_attention)
+        input_dec_norm = self.norms[0](input_dec)
+        output_masked_attention = self.masked_attentions(input_dec_norm, pad_mask=trg_pad_mask)
+        output_masked_attention = self.dropouts[0](output_masked_attention)
 
         # ==================== 残差连接 ====================
-        masked_attention_norm_output = output_masked_attention + input_dec
+        masked_attention_res_add = output_masked_attention + input_dec
 
         # ==================== 多头交叉注意力机制 ====================
-        masked_attention_norm_output = self.norms[1](masked_attention_norm_output)
+        masked_attention_norm_output = self.norms[1](masked_attention_res_add)
         output_cross_attention = self.cross_attentions(masked_attention_norm_output, output_dec=input_enc, pad_mask=src_pad_mask)
-        output_cross_attention = self.dropout(output_cross_attention)
+        output_cross_attention = self.dropouts[1](output_cross_attention)
 
         # ==================== 残差连接 ====================
-        cross_attention_norm_output = output_cross_attention + masked_attention_norm_output
+        cross_attention_res_add = output_cross_attention + masked_attention_res_add
 
         # ==================== feed_forward层 ====================
-        cross_attention_norm_output = self.norms[2](cross_attention_norm_output)
+        cross_attention_norm_output = self.norms[2](cross_attention_res_add)
         feed_forward_output = self.feed_forward(cross_attention_norm_output)
-        feed_forward_output = self.dropout(feed_forward_output)
+        feed_forward_output = self.dropouts[2](feed_forward_output)
 
         # ==================== 残差连接 ====================
-        norm_output = cross_attention_norm_output + feed_forward_output
+        norm_output = cross_attention_res_add + feed_forward_output
         return norm_output
