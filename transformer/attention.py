@@ -53,7 +53,7 @@ class Attention(nn.Module):
 
         # 如果是掩码注意力需要加上一个上三角矩阵
         if self.attention_type == MASKED_ATTENTION_TYPE:
-            m = torch.triu(torch.ones_like(s_scaled), diagonal=1)
+            m = torch.triu(torch.ones_like(s_scaled), diagonal=1).bool()
             s_scaled = s_scaled.masked_fill(m, -1e9)
         scores = torch.softmax(s_scaled, dim=-1)
 

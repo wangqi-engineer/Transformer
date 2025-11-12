@@ -107,21 +107,21 @@ class DataPreprocessor:
                 'valid': valid_data,
                 'test': test_data
             }
-            pickle.dump(data, open(os.path.join(opt.data_dir, opt.save_data), 'wb'))
+            pickle.dump(data, open(os.path.join(opt.output_dir, opt.save_data), 'wb'))
             print(f'[Info] Save vocabulary and data finished')
 
 
 def main():
     """
     准备数据集，做好词汇表，完成数据集划分，特殊词处理等数据清洗工作
-    使用：python preprocess.py -data_dir data -save_data preprocess_data.pkl -max_seq_len 100 -sample_size 1e6 -vocab_range train -vocab_min_freq 3
+    使用：python preprocess.py -data_dir data -output_dir outputs/preprocess -save_data preprocess_data.pkl -max_seq_len 100 -sample_size 1e6 -vocab_range train -vocab_min_freq 3
     """
 
     # ==================== 解析命令行参数，获取参数配置 ====================
     parser = argparse.ArgumentParser()
     parser.add_argument('-data_dir', default='data')
+    parser.add_argument('-output_dir', default='outputs/preprocess')
     parser.add_argument('-save_data', default='preprocess_data.pkl')
-    # todo: 考虑是否根据数据集分别为 src 和 trg 设立动态的最大序列长度
     parser.add_argument('-max_seq_len', type=int, default=100)
     parser.add_argument('-sample_size', type=int, default=1e6)
 
@@ -133,6 +133,10 @@ def main():
     # 如果不存在数据集文件夹则创建
     if not os.path.exists(opt.data_dir):
         os.mkdir(opt.data_dir)
+
+    # 如果输出文件夹不存在则创建
+    if not os.path.exists(opt.output_dir):
+        os.makedirs(opt.output_dir, exist_ok=True)
 
     data_preprocessor = DataPreprocessor(opt.data_dir, opt.max_seq_len)
     # ==================== 数据预处理并通过文件保存 ====================

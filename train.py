@@ -30,7 +30,7 @@ def train():
     parser.add_argument('-b', '--batch_size', type=int, default=128)
     parser.add_argument('-epoch', type=int, default=100)
     parser.add_argument('-output_dir', default='outputs/train')
-    parser.add_argument('-data_pkl', default='data/preprocess_data.pkl')
+    parser.add_argument('-data_pkl', default='outputs/preprocess/preprocess_data.pkl')
     parser.add_argument('-model_dir', default='')
 
     parser.add_argument('-layer_num', type=int, default=6)
