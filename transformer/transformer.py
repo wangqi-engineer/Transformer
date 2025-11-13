@@ -52,8 +52,8 @@ class Transformer(nn.Module):
 
         # ==================== Embedding和位置编码 ====================
         # 计算位置编码
-        src_seq_input = self.encoder_embedding(src_seq) + self.position_encoder.position_codes
-        trg_seq_input = self.decoder_embedding(trg_seq) + self.position_encoder.position_codes
+        src_seq_input = self.encoder_embedding(src_seq) + self.position_encoder.position_codes.to(src_seq.device)
+        trg_seq_input = self.decoder_embedding(trg_seq) + self.position_encoder.position_codes.to(trg_seq.device)
 
         # 添加必要的dropout
         src_seq_input = self.src_dropout(src_seq_input)

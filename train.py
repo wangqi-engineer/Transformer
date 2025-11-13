@@ -178,8 +178,8 @@ def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total
     for src, trg in tqdm(train_dataloader, desc=desc, mininterval=2, leave=False):
         # 前向计算
         print('[Info] Start forward computing...')
-        src.to(device)
-        trg.to(device)
+        src = src.to(device)
+        trg = trg.to(device)
         pred = transformer(src, trg)
         print('[Info] Finish forward computing...')
         # 反向传播
@@ -252,8 +252,8 @@ def cal_loss(opt, pred, trg):
 def smooth_label_process(no_padding_mask, opt, pred, trg, valid_words_num):
     eps = 0.1
     # 建立idx索引序，举例而言trg_one_hot_idx中的[0, 1, 15]表示在one_hot_trg中的(0, 1, 15)处的值近似为1
-    batch_idx = torch.arange(opt.batch_size).view(-1, 1, 1).expand(-1, opt.max_seq_len, 1)
-    seq_idx = torch.arange(opt.max_seq_len).view(1, -1, 1).expand(opt.batch_size, -1, 1)
+    batch_idx = torch.arange(opt.batch_size).view(-1, 1, 1).expand(-1, opt.max_seq_len, 1).to(trg.device)
+    seq_idx = torch.arange(opt.max_seq_len).view(1, -1, 1).expand(opt.batch_size, -1, 1).to(trg.device)
     vocab_idx = trg.unsqueeze(-1)
     trg_one_hot_idx = torch.cat([batch_idx, seq_idx, vocab_idx], dim=-1)
     # 构建平滑标签，使用极小值eps避免分布过于尖锐
@@ -261,7 +261,7 @@ def smooth_label_process(no_padding_mask, opt, pred, trg, valid_words_num):
     smooth_one_value = 1 - eps + eps / opt.trg_vocab_size
     # dtype声明很关键！不然极小值会被转换成0
     one_hot_trg = torch.full((opt.batch_size, opt.max_seq_len, opt.trg_vocab_size), smooth_zero_value,
-                             dtype=torch.float32)
+                             dtype=torch.float32, device=trg.device)
     one_hot_trg.scatter_(2, trg_one_hot_idx, smooth_one_value)
     # 对pred进行log_softmax
     pred_log_softmax = F.log_softmax(pred, dim=-1)
