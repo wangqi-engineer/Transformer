@@ -21,7 +21,7 @@ from transformer.transformer import Transformer
 
 def performance_str(tag, epoch_i, epochs, loss, ppl, accuracy, lr, duration):
     return (f'[{tag}] epoch: {epoch_i}/{epochs}, loss: {loss:.4f}, ppl: {ppl:.4f}, accuracy: {100*accuracy:.2f}%, '
-            f'lr: {lr:.4f}, duration: {duration:.2f}s')
+            f'lr: {lr:.4f}, duration: {duration:.2f}s\n')
 
 
 def train():
