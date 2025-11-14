@@ -70,18 +70,18 @@ def train():
     tokenizer = Tokenizer(vocab)
 
     # 开始tokenizer训练数据
-    print(f'[Info] Start to tokenize train data. Please waiting soon...')
+    # print(f'[Info] Start to tokenize train data. Please waiting soon...')
     start_tokenizer_train = time.time()
     train_src_tensor, train_trg_tensor = tokenizer.tokenize(train_data)
     duration = time.time() - start_tokenizer_train
-    print(f'[Info] Tokenizer train data finished with duration {duration:.2f}s')
+    # print(f'[Info] Tokenizer train data finished with duration {duration:.2f}s')
 
     # 开始tokenizer验证数据
-    print(f'[Info] Start to tokenize valid data. Please waiting soon...')
+    # print(f'[Info] Start to tokenize valid data. Please waiting soon...')
     start_tokenizer_valid = time.time()
     valid_src_tensor, valid_trg_tensor = tokenizer.tokenize(valid_data)
     duration = time.time() - start_tokenizer_valid
-    print(f'[Info] Tokenizer valid data finished with duration {duration:.2f}s')
+    # print(f'[Info] Tokenizer valid data finished with duration {duration:.2f}s')
 
     # 封装成dataset类
     train_dataset = TensorDataset(train_src_tensor, train_trg_tensor)
@@ -161,7 +161,7 @@ def train():
         # 分别将统计指标写入到训练日志和验证日志中，方便观察训练结果
         train_log = os.path.join(opt.output_dir, 'train.log')
         valid_log = os.path.join(opt.output_dir, 'valid.log')
-        with open(train_log, 'w', encoding='utf-8') as train_file, open(valid_log, 'w', encoding='utf-8') as valid_file:
+        with open(train_log, 'a', encoding='utf-8') as train_file, open(valid_log, 'a', encoding='utf-8') as valid_file:
             train_file.write(train_performances)
             valid_file.write(valid_performances)
 
@@ -177,13 +177,13 @@ def train():
 def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total_words, train_dataloader, transformer):
     for src, trg in tqdm(train_dataloader, desc=desc, mininterval=2, leave=False):
         # 前向计算
-        print('[Info] Start forward computing...')
+        # print('[Info] Start forward computing...')
         src = src.to(device)
         trg = trg.to(device)
         pred = transformer(src, trg)
-        print('[Info] Finish forward computing...')
+        # print('[Info] Finish forward computing...')
         # 反向传播
-        print('[Info] Start backward computing...')
+        # print('[Info] Start backward computing...')
         # 统计未 padding 的词
         cur_correct, loss, valid_words_num = cal_loss(opt, pred, trg)
         scheduler.zero_grad()
@@ -193,7 +193,7 @@ def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total
         torch.nn.utils.clip_grad_norm_(transformer.parameters(), max_norm=5)
 
         scheduler.update_and_step()
-        print('[Info] Finish backward computing...')
+        # print('[Info] Finish backward computing...')
         # 指标统计
         running_loss += loss.item()
         step += 1
