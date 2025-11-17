@@ -1,9 +1,13 @@
 """ 工具类 """
+from sys import platform
+
+import psutil
 import torch
 from tqdm import tqdm
 
 from constants import UNK_WORD, BOS_WORD, EOS_WORD, PAD_WORD
 from transformer.transformer import Transformer
+import GPUtil
 
 
 class Tokenizer:
@@ -77,3 +81,53 @@ class ModelLoader:
         )
         transformer.load_state_dict(self.checkpoint['params'])
         return transformer
+
+class DeviceMonitor:
+    """ 设备信息监控类 """
+    def __init__(self, log):
+        self.log = log
+
+    def display_device_info(self):
+        """ 打印训练设备详细信息 """
+        self.log.info('Device Info')
+        self.log.info('=' * 60)
+
+        # GPU信息
+        if torch.cuda.is_available():
+            self.log.info(f'CUDA Available: {torch.cuda.is_available()}')
+            self.log.info(f'CUDA Version: {torch.version.cuda}')
+            self.log.info(f'Current GPU: {torch.cuda.current_device()}')
+            self.log.info(f'GPU Name: {torch.cuda.get_device_name()}')
+            self.log.info(f'GPU Count: {torch.cuda.device_count()}')
+
+            # 详细GPU信息
+            gpus = GPUtil.getGPUs()
+            for i, gpu in enumerate(gpus):
+                self.log.info(f'\n GPU {i} Detail Info:')
+                self.log.info(f'  ├─ ID: {gpu.id}')
+                self.log.info(f"  ├─ Name: {gpu.name}")
+                self.log.info(f"  ├─ Memory: {gpu.memoryTotal}MB")
+                self.log.info(f"  ├─ Driver: {gpu.driver}")
+                self.log.info(f"  └─ UUID: {gpu.uuid}")
+        else:
+            self.log.info('Cuda Unavailable, Use CPU Instead')
+
+        # CPU信息
+        self.log.info(f"\n CPU Info:")
+        self.log.info(f"  ├─ Physical CPU Count: {psutil.cpu_count(logical=False)}")
+        self.log.info(f"  ├─ Logical CPU Count: {psutil.cpu_count(logical=True)}")
+        self.log.info(f"  ├─ CPU Frequency: {psutil.cpu_freq().current if psutil.cpu_freq() else 'N/A'} MHz")
+        self.log.info(f"  └─ Architecture: {platform.processor() if hasattr(platform, 'processor') else 'N/A'}")
+
+        # 内存信息
+        memory = psutil.virtual_memory()
+        self.log.info(f"\n Memory Info:")
+        self.log.info(f"  ├─ Total Memory: {memory.total / (1024 ** 3):.1f} GB")
+        self.log.info(f"  ├─ Available Memory: {memory.available / (1024 ** 3):.1f} GB")
+        self.log.info(f"  └─ Percent Memory: {memory.percent}%")
+
+        # PyTorch信息
+        self.log.info(f"\n PyTorch Info:")
+        self.log.info(f"  └─ Version: {torch.__version__}")
+
+        self.log.info("=" * 60)

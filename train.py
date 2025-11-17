@@ -1,6 +1,7 @@
 """ Transformer模型训练 """
 
 import argparse
+import logging
 import os.path
 import time
 
@@ -12,16 +13,20 @@ from spacy.compat import pickle
 from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from torch.cuda.amp import autocast
 
+from logger import TransformerLogger
 from transformer.lr_scheduler import LRScheduler
-from utils import Tokenizer, ModelLoader
+from utils import Tokenizer, ModelLoader, DeviceMonitor
 from constants import PAD_WORD
 from transformer.transformer import Transformer
 
+# 设置全局日志变量
+log = logging.getLogger(__name__)
 
 def performance_str(tag, epoch_i, epochs, loss, ppl, accuracy, lr, duration):
     return (f'[{tag}] epoch: {epoch_i}/{epochs}, loss: {loss:.4f}, ppl: {ppl:.4f}, accuracy: {100*accuracy:.2f}%, '
-            f'lr: {lr:.4f}, duration: {duration:.2f}s\n')
+            f'lr: {lr:.4f}, duration: {duration:.2f}s')
 
 
 def train():
@@ -49,9 +54,19 @@ def train():
     if not os.path.exists(opt.output_dir):
         os.makedirs(opt.output_dir, exist_ok=True)
 
+    # 初始化日志信息
+    log_dir = os.path.join(opt.output_dir, 'train.log')
+    global log
+    log = TransformerLogger.setup_logger(log_dir)
+
     if opt.model_dir and not os.path.exists(opt.model_dir):
         # 如果要训练一个已经加载一半的模型但是路径不存在，则报错
+        log.error(f'param model_dir:{opt.model_dir} does not exist')
         raise ValueError(f'param model_dir:{opt.model_dir} does not exist')
+
+    # ==================== 初始化训练监控类 ====================
+    device_monitor = DeviceMonitor(log)
+    device_monitor.display_device_info()
 
     # ==================== 加载训练和验证数据集 ====================
     # 读取pkl文件中的数据集
@@ -70,26 +85,47 @@ def train():
     tokenizer = Tokenizer(vocab)
 
     # 开始tokenizer训练数据
-    # print(f'[Info] Start to tokenize train data. Please waiting soon...')
+    log.debug(f'Start to tokenize train data. Please waiting soon...')
     start_tokenizer_train = time.time()
     train_src_tensor, train_trg_tensor = tokenizer.tokenize(train_data)
     duration = time.time() - start_tokenizer_train
-    # print(f'[Info] Tokenizer train data finished with duration {duration:.2f}s')
+    log.debug(f'Tokenizer train data finished with duration {duration:.2f}s')
 
     # 开始tokenizer验证数据
-    # print(f'[Info] Start to tokenize valid data. Please waiting soon...')
+    log.debug(f'Start to tokenize valid data. Please waiting soon...')
     start_tokenizer_valid = time.time()
     valid_src_tensor, valid_trg_tensor = tokenizer.tokenize(valid_data)
     duration = time.time() - start_tokenizer_valid
-    # print(f'[Info] Tokenizer valid data finished with duration {duration:.2f}s')
+    log.debug(f'Tokenizer valid data finished with duration {duration:.2f}s')
 
     # 封装成dataset类
     train_dataset = TensorDataset(train_src_tensor, train_trg_tensor)
     valid_dataset = TensorDataset(valid_src_tensor, valid_trg_tensor)
 
     # 构造dataloader类，方便后面训练和统计指标
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=opt.batch_size, shuffle=True)
-    valid_dataloader = DataLoader(dataset=valid_dataset, batch_size=opt.batch_size, shuffle=True)
+    #   获取cpu核心线程数，最小为1，最大不超过16
+    num_cpus = max(1, int(os.cpu_count() * 0.75))
+    num_cpus = min(num_cpus, 16)
+
+    #   采用多线程加载数据，开启线程预加载，开启锁页内存，确保加载线程存活
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=opt.batch_size,
+        shuffle=True,
+        num_workers=num_cpus,
+        prefetch_factor=2,
+        pin_memory=True,
+        persistent_workers=True
+    )
+    valid_dataloader = DataLoader(
+        dataset=valid_dataset,
+        batch_size=opt.batch_size,
+        shuffle=True,
+        num_workers=num_cpus,
+        prefetch_factor=2,
+        pin_memory=True,
+        persistent_workers=True
+    )
 
     # ==================== 初始化模型，学习率优化器等 ====================
     if not opt.model_dir:
@@ -113,6 +149,11 @@ def train():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     transformer.to(device)
+    # 使用pytorch2.0编译优化加速训练
+    if hasattr(torch, 'compile'):
+        transformer = torch.compile(transformer)
+    else:
+        log.warning('NO PYTORCH 2.0 COMPILATION OPTIMIZATION')
     optimizer = optim.Adam(transformer.parameters(), lr=opt.lr, betas=(0.9, 0.98), eps=1e-9)
     scheduler = LRScheduler(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec)
 
@@ -138,7 +179,7 @@ def train():
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         opt.lr = lr
         train_performances = performance_str('Training', epoch_i, opt.epoch, train_loss, train_ppl, train_acc, lr, train_duration)
-        print(train_performances)
+        log.info(train_performances)
 
         # ==================== 在验证集上统计指标 ====================
         transformer.eval()
@@ -159,11 +200,11 @@ def train():
 
         # ==================== 统计指标写入文件 ====================
         # 分别将统计指标写入到训练日志和验证日志中，方便观察训练结果
-        train_log = os.path.join(opt.output_dir, 'train.log')
-        valid_log = os.path.join(opt.output_dir, 'valid.log')
+        train_log = os.path.join(opt.output_dir, 'train_perf.log')
+        valid_log = os.path.join(opt.output_dir, 'valid_perf.log')
         with open(train_log, 'a', encoding='utf-8') as train_file, open(valid_log, 'a', encoding='utf-8') as valid_file:
-            train_file.write(train_performances)
-            valid_file.write(valid_performances)
+            train_file.write(train_performances + '\n')
+            valid_file.write(valid_performances + '\n')
 
         # ==================== tensorboard对训练过程可视化 ====================
         tb_writer = SummaryWriter(log_dir=os.path.join(opt.output_dir, 'tensorboard'))
@@ -176,24 +217,27 @@ def train():
 
 def train_epoch(correct, desc, device, opt, running_loss, scheduler, step, total_words, train_dataloader, transformer):
     for src, trg in tqdm(train_dataloader, desc=desc, mininterval=2, leave=False):
+        # 梯度清零
+        scheduler.zero_grad()
         # 前向计算
-        # print('[Info] Start forward computing...')
+        log.debug('Start forward computing...')
         src = src.to(device)
         trg = trg.to(device)
-        pred = transformer(src, trg)
-        # print('[Info] Finish forward computing...')
-        # 反向传播
-        # print('[Info] Start backward computing...')
-        # 统计未 padding 的词
-        cur_correct, loss, valid_words_num = cal_loss(opt, pred, trg)
-        scheduler.zero_grad()
-        loss.backward()
+        # 开启混合精度
+        with autocast():
+            pred = transformer(src, trg)
+            log.debug('Finish forward computing...')
+            # 反向传播
+            log.debug('Start backward computing...')
+            # 统计未 padding 的词
+            cur_correct, loss, valid_words_num = cal_loss(opt, pred, trg)
+        scheduler.backward(loss)
 
         # 梯度裁剪
         torch.nn.utils.clip_grad_norm_(transformer.parameters(), max_norm=5)
 
         scheduler.update_and_step()
-        # print('[Info] Finish backward computing...')
+        log.debug('Finish backward computing...')
         # 指标统计
         running_loss += loss.item()
         step += 1
@@ -227,7 +271,7 @@ def valid_epoch(device, epoch_i, lr, opt, transformer, valid_dataloader):
         valid_duration = time.time() - start_valid_time
         valid_performances = performance_str('Validating', epoch_i, opt.epoch, valid_loss, valid_ppl, valid_acc,
                                              lr, valid_duration)
-        print(valid_performances)
+        log.info(valid_performances)
     return valid_acc, valid_loss, valid_performances, valid_ppl
 
 
