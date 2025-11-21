@@ -1,4 +1,5 @@
 """ 工具类 """
+import os
 from sys import platform
 
 import psutil
@@ -89,8 +90,8 @@ class DeviceMonitor:
 
     def display_device_info(self):
         """ 打印训练设备详细信息 """
-        self.log.info('Device Info')
         self.log.info('=' * 60)
+        self.log.info('[Device Info]')
 
         # GPU信息
         if torch.cuda.is_available():
@@ -103,17 +104,18 @@ class DeviceMonitor:
             # 详细GPU信息
             gpus = GPUtil.getGPUs()
             for i, gpu in enumerate(gpus):
-                self.log.info(f'\n GPU {i} Detail Info:')
+                self.log.info(f' GPU {i} Detail Info:')
                 self.log.info(f'  ├─ ID: {gpu.id}')
                 self.log.info(f"  ├─ Name: {gpu.name}")
-                self.log.info(f"  ├─ Memory: {gpu.memoryTotal}MB")
+                self.log.info(f"  ├─ Memory: {gpu.memoryUsed} MB / {gpu.memoryTotal} MB")
+                self.log.info(f"  ├─ Memory Rate: {gpu.memoryUtil * 100:.1f}%")
                 self.log.info(f"  ├─ Driver: {gpu.driver}")
                 self.log.info(f"  └─ UUID: {gpu.uuid}")
         else:
             self.log.info('Cuda Unavailable, Use CPU Instead')
 
         # CPU信息
-        self.log.info(f"\n CPU Info:")
+        self.log.info(f" CPU Info:")
         self.log.info(f"  ├─ Physical CPU Count: {psutil.cpu_count(logical=False)}")
         self.log.info(f"  ├─ Logical CPU Count: {psutil.cpu_count(logical=True)}")
         self.log.info(f"  ├─ CPU Frequency: {psutil.cpu_freq().current if psutil.cpu_freq() else 'N/A'} MHz")
@@ -121,13 +123,52 @@ class DeviceMonitor:
 
         # 内存信息
         memory = psutil.virtual_memory()
-        self.log.info(f"\n Memory Info:")
+        self.log.info(f" Memory Info:")
         self.log.info(f"  ├─ Total Memory: {memory.total / (1024 ** 3):.1f} GB")
         self.log.info(f"  ├─ Available Memory: {memory.available / (1024 ** 3):.1f} GB")
         self.log.info(f"  └─ Percent Memory: {memory.percent}%")
 
         # PyTorch信息
-        self.log.info(f"\n PyTorch Info:")
+        self.log.info(f" PyTorch Info:")
         self.log.info(f"  └─ Version: {torch.__version__}")
 
         self.log.info("=" * 60)
+
+    def display_gpu_memory(self):
+        if torch.cuda.is_available():
+            self.log.info('=' * 60)
+            self.log.info('[GPU Memory Usage]')
+
+            gpus = GPUtil.getGPUs()
+            for gpu in gpus:
+                self.log.info(f"GPU Memory: {gpu.memoryUsed} MB / {gpu.memoryTotal} MB")
+                self.log.info(f"GPU Memory Rate: {gpu.memoryUtil * 100:.1f}%")
+
+
+class ModelSizeEval:
+    """ 评估模型大小 """
+    def __init__(self, transformer, model_dir=None):
+        if transformer is None:
+            if not os.path.exists(model_dir):
+                raise ValueError('param model_dir does not exist')
+
+            # ==================== 加载模型 ====================
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            checkpoint = torch.load(model_dir)
+            transformer = ModelLoader(checkpoint).load_exist_model()
+            transformer.to(device)
+        self.transformer = transformer
+
+    def calculate_model_size(self):
+        # ==================== 评估模型大小 ====================
+        total_params = sum(p.numel() for p in self.transformer.parameters())
+        trainable_params = sum(p.numel() for p in self.transformer.parameters() if p.requires_grad)
+
+        status = {
+            'total_parameters': total_params,
+            'trainable_parameters': trainable_params,
+            'total_M': total_params / 1e6,
+            'trainable_M': trainable_params / 1e6
+        }
+
+        return status

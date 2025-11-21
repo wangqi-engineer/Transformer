@@ -1,6 +1,7 @@
 """ Transformer模型翻译文本 """
 
 import argparse
+import logging
 import os.path
 import pickle
 import time
@@ -9,15 +10,18 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
+from logger import TransformerLogger
 from utils import Tokenizer, ModelLoader
+
+log = logging.getLogger(__name__)
 
 
 def main():
     # ==================== 解析命令行参数，获取参数配置 ====================
     parser = argparse.ArgumentParser()
-    parser.add_argument('-model_dir', default='outputs/train/model.chkpt')
-    parser.add_argument('-output_dir', default='outputs/translate')
-    parser.add_argument('-b', '--batch_size', type=int, default=128)
+    parser.add_argument('-model_dir', default='outputs/train/model.chkpt', help='模型路径')
+    parser.add_argument('-output_dir', default='outputs/translate', help='脚本输出路径')
+    parser.add_argument('-b', '--batch_size', type=int, default=128, help='每次从DataLoader中拿到的批数据大小')
 
     opt = parser.parse_args()
 
@@ -26,6 +30,11 @@ def main():
 
     if not os.path.exists(opt.output_dir):
         os.makedirs(opt.output_dir)
+
+    # 初始化日志信息
+    log_dir = os.path.join(opt.output_dir, 'translate.log')
+    global log
+    log = TransformerLogger.setup_logger(log_dir)
 
     # ==================== 加载模型 ====================
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -66,6 +75,7 @@ def main():
                 trg_sentence = tokenizer.translate(trg[idx], 'trg')
 
                 # 将要翻译的语句，翻译的语句和时间语句分为一组进行打印
+                # todo: 采用束采样重新修改逻辑
                 file.write(f'[SRC] {src_sentence}\n')
                 print(f'[SRC] {src_sentence}')
 

@@ -1,6 +1,7 @@
 """ 数据准备和预处理 """
 import argparse
 import csv
+import logging
 import os.path
 import pickle
 import random
@@ -10,6 +11,9 @@ from itertools import islice
 from pathlib import Path
 
 from constants import BOS_WORD, EOS_WORD, PAD_WORD, UNK_WORD
+from logger import TransformerLogger
+
+log = logging.getLogger(__name__)
 
 
 class Vocabulary:
@@ -71,14 +75,14 @@ class DataPreprocessor:
             data = []
             start_time = time.time()
             sliced_reader = islice(csv_reader, int(opt.sample_size))
-            print('[Info] Start to load data from csv. Please waiting soon...')
+            log.info('Start to load data from csv. Please waiting soon...')
             for idx, row in enumerate(sliced_reader, start=1):
                 # 读取数据集时就添加特殊词，完成填充/截断逻辑
                 src_sentence = self._preprocess_sentence(row['1'])
                 trg_sentence = self._preprocess_sentence(row['0'])
                 data.append({str('src'): src_sentence, str('trg'): trg_sentence})
             duration = time.time() - start_time
-            print(f'[Info] Load data from csv file finished with duration: {duration:.2f}s')
+            log.info(f'Load data from csv file finished with duration: {duration:.2f}s')
 
             # ==================== 将数据集划分为训练、验证和测试集 ====================
             shuffle_data = data.copy()
@@ -91,12 +95,12 @@ class DataPreprocessor:
 
             # ==================== 构建词表 ====================
             # 包含训练数据集的src和trg词表，已经添加特殊词和padding/slicing之后的原始文本数据
-            print('[Info] Start to build vocabulary. Please waiting soon...')
+            log.info('Start to build vocabulary. Please waiting soon...')
             start_build_vocab = time.time()
             vocab_data = train_data if opt.vocab_range == 'train' else data
             train_vocab = Vocabulary(vocab_data, opt.max_seq_len).build_vocabulary(min_freq=opt.vocab_min_freq)
             duration = time.time() - start_build_vocab
-            print(f'[Info] Build vocabulary finished with duration: {duration:.2f}s')
+            log.info(f'Build vocabulary finished with duration: {duration:.2f}s')
 
             # ==================== 数据存为文件 ====================
             # 将opt，词汇表和训练和验证的数据集全部存为文件
@@ -108,7 +112,7 @@ class DataPreprocessor:
                 'test': test_data
             }
             pickle.dump(data, open(os.path.join(opt.output_dir, opt.save_data), 'wb'))
-            print(f'[Info] Save vocabulary and data finished')
+            log.info(f'Save vocabulary and data finished')
 
 
 def main():
@@ -119,14 +123,14 @@ def main():
 
     # ==================== 解析命令行参数，获取参数配置 ====================
     parser = argparse.ArgumentParser()
-    parser.add_argument('-data_dir', default='data')
-    parser.add_argument('-output_dir', default='outputs/preprocess')
-    parser.add_argument('-save_data', default='preprocess_data.pkl')
-    parser.add_argument('-max_seq_len', type=int, default=100)
-    parser.add_argument('-sample_size', type=int, default=1e6)
+    parser.add_argument('-data_dir', default='data', help='预处理的数据路径')
+    parser.add_argument('-output_dir', default='outputs/preprocess', help='预处理输出路径')
+    parser.add_argument('-save_data', default='preprocess_data.pkl', help='保存的词表、设置参数和数据集信息')
+    parser.add_argument('-max_seq_len', type=int, default=100, help='最大序列长度')
+    parser.add_argument('-sample_size', type=int, default=2e6, help='样本最大数量')
 
-    parser.add_argument('-vocab_range', choices=['train', 'all'], default='train')
-    parser.add_argument('-vocab_min_freq', type=int, default=3)
+    parser.add_argument('-vocab_range', choices=['train', 'all'], default='train', help='词表范围，训练集还是全量样本')
+    parser.add_argument('-vocab_min_freq', type=int, default=3, help='词表最小频率')
 
     opt = parser.parse_args()
 
@@ -138,10 +142,15 @@ def main():
     if not os.path.exists(opt.output_dir):
         os.makedirs(opt.output_dir, exist_ok=True)
 
+    # 初始化日志信息
+    log_dir = os.path.join(opt.output_dir, 'preprocess.log')
+    global log
+    log = TransformerLogger.setup_logger(log_dir)
+
     data_preprocessor = DataPreprocessor(opt.data_dir, opt.max_seq_len)
     # ==================== 数据预处理并通过文件保存 ====================
     data_preprocessor.load_raw_file2_pickle_file(opt)
-    print('[Info] Preprocess dataset finish')
+    log.info('Preprocess dataset finish')
 
 
 if __name__ == '__main__':
