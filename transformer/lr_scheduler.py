@@ -5,11 +5,12 @@ from torch.amp import GradScaler
 __author__ = "Wang Qi"
 
 class SchedulerOptim:
-    def __init__(self, optimizer, warmup_steps, model_size):
+    def __init__(self, optimizer, warmup_steps, model_size, lr_mul):
         self.optimizer = optimizer
         self.warmup_steps = warmup_steps
         self.model_size = model_size
         self._cur_step = 0
+        self.lr_mul = lr_mul
         # 开启混合精度
         self.scaler = GradScaler('cuda')
 
@@ -22,7 +23,7 @@ class SchedulerOptim:
         warmup_factor = np.power(self._cur_step, -0.5)
         # 衰减阶段倒数平方根递减，快速衰减学习率找到局部最优解
         decay_factor = self._cur_step * np.power(self.warmup_steps, -1.5)
-        lr = factor * min(warmup_factor, decay_factor)
+        lr = self.lr_mul * factor * min(warmup_factor, decay_factor)
         # 学习率调整
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr

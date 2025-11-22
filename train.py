@@ -62,7 +62,7 @@ def train():
     parser.add_argument('-d_ff', type=int, default=2048, help='feed back层高频映射维度')
     parser.add_argument('-dropout', type=float, default=0.1, help='dropout率')
     parser.add_argument('-warmup_steps', type=int, default=4000, help='预热步数')
-    parser.add_argument('-lr', type=float, default=1e-3, help='初始学习率')
+    parser.add_argument('-lr_mul', type=float, default=2.0, help='学习率伸缩因子')
 
     parser.add_argument('-save_mode', choices=['best', 'all'], default='best', help='保存模型方式；全量保存还是最有保存')
     parser.add_argument('-no_label_smooth', action='store_true', help='是否设置标签平滑')
@@ -185,8 +185,8 @@ def train():
         transformer = torch.compile(transformer)
     else:
         log.warning('NO PYTORCH 2.0 COMPILATION OPTIMIZATION')
-    optimizer = optim.Adam(transformer.parameters(), lr=opt.lr, betas=(0.9, 0.98), eps=1e-9)
-    scheduler = SchedulerOptim(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec)
+    optimizer = optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-9)
+    scheduler = SchedulerOptim(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec, lr_mul=opt.lr_mul)
 
     # 模型大小
     model_status = ModelSizeEval(transformer).calculate_model_size()
@@ -349,6 +349,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         training_statics_epoch.correct += cur_correct
         training_statics_epoch.total_words += valid_words_num
 
+        # todo: 如果这里需要删除，那么opt参数解析多余的参数也删除掉
         # train_loss = loss.item()
         # train_acc = cur_correct / valid_words_num
         # train_ppl = np.exp(min(train_loss, 100))
