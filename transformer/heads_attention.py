@@ -6,6 +6,7 @@ import torch.nn as nn
 from transformer.attention import Attention
 from transformer.model_constants import CROSS_ATTENTION_TYPE
 
+__author__ = "Wang Qi"
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, head_num, word_vec, attention_type, dropout):

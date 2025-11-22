@@ -23,6 +23,8 @@ from utils import Tokenizer, ModelLoader, DeviceMonitor, ModelSizeEval
 from constants import PAD_WORD
 from transformer.transformer import Transformer
 
+__author__ = "Wang Qi"
+
 # 设置全局日志变量
 log = logging.getLogger(__name__)
 
@@ -32,11 +34,12 @@ torch.set_float32_matmul_precision('high')
 # 设置最小验证集损失值
 min_valid_loss = 1e9
 
-# 设置全局训练步数
+# 设置当前步数和每轮的总步数
+cur_step = 0
 total_step = 0
 
 def performance_str(tag, epoch_i, epochs, loss, ppl, accuracy, lr, duration):
-    return (f'[{tag}] total step: {total_step}, epoch: {epoch_i}/{epochs}, loss: {loss:.4f}, ppl: {ppl:.4f}, accuracy: {100*accuracy:.2f}%, '
+    return (f'[{tag}] training step: {cur_step}/{total_step}, epoch: {epoch_i}/{epochs}, loss: {loss:.4f}, ppl: {ppl:.4f}, accuracy: {100*accuracy:.2f}%, '
             f'lr: {lr:.4f}, duration: {duration:.2f}s')
 
 
@@ -112,6 +115,8 @@ def train():
     log.info(f'[Data Size] Train data size: {len(train_data)}')
     log.info(f'[Data Size] Valid data size: {len(valid_data)}')
     log.info('=' * 60)
+    global total_step
+    total_step = len(train_data) / opt.batch_size
 
     # 开始tokenizer训练数据
     log.debug(f'Start to tokenize train data. Please waiting soon...')
@@ -282,8 +287,8 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         train_ppl = np.exp(min(train_loss, 100))
         train_duration = time.time() - train_step_start
 
-        global total_step
-        total_step += 1
+        global cur_step
+        cur_step += 1
 
         training_statics = TrainingStatics(
             train_acc=train_acc,
@@ -308,11 +313,11 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools):
-    if total_step % training_tools.opt.gpu_monitor_steps == 0:
+    if cur_step % training_tools.opt.gpu_monitor_steps == 0:
         # 检测当前设备gpu显存的使用情况
-        training_tools.device_monitor.display_gpu_memory()
+        training_tools.device_monitor.display_gpu_memory(cur_step, total_step, training_statics.epoch_i, training_tools.opt.epoch)
 
-    if total_step % training_tools.opt.model_eval_steps == 0:
+    if cur_step % training_tools.opt.model_eval_steps == 0:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         training_tools.opt.lr = lr
@@ -326,12 +331,12 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
                                                                            lr, training_tools.opt, training_tools.transformer,
                                                                            training_tools.valid_dataloader)
 
-        if total_step % training_tools.opt.model_save_steps == 0:
+        if cur_step % training_tools.opt.model_save_steps == 0:
             # ==================== 根据不同的保存策略保存模型 ====================
             # 模型参数，epoch_i和opt都需要保存
             checkpoint = {'params': training_tools.transformer.state_dict(),
                           'epoch': training_statics.epoch_i,
-                          'step': total_step,
+                          'step': cur_step,
                           'settings': training_tools.opt}
             if training_tools.opt.save_mode == 'all':
                 # 保存每个周期生成的checkpoint，
@@ -355,17 +360,17 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
         tb_writer = SummaryWriter(log_dir=os.path.join(training_tools.opt.output_dir, 'tensorboard'))
         tb_writer.add_scalars('accuracy',
                               {'train': 100 * training_statics.train_acc, 'valid': 100 * valid_acc},
-                              total_step)
+                              cur_step)
         tb_writer.add_scalars('loss',
                               {'train': training_statics.train_loss, 'valid': valid_loss},
-                              total_step)
+                              cur_step)
         tb_writer.add_scalars('loss',
                               {'train': training_statics.train_loss, 'valid': valid_loss},
-                              total_step)
+                              cur_step)
         tb_writer.add_scalars('ppl',
                               {'train': training_statics.train_ppl, 'valid': valid_ppl},
-                              total_step)
-        tb_writer.add_scalar('lr', lr, total_step)
+                              cur_step)
+        tb_writer.add_scalar('lr', lr, cur_step)
 
 
 def valid_epoch(device, epoch_i, lr, opt, transformer, valid_dataloader):

@@ -5,6 +5,7 @@ from transformer.model_constants import SELF_ATTENTION_TYPE, MASKED_ATTENTION_TY
 from transformer.layer_norm import LayerNorm
 from transformer.heads_attention import MultiHeadAttention
 
+__author__ = "Wang Qi"
 
 class EncoderLayer(nn.Module):
     """ 编码器子层 """

@@ -1,6 +1,7 @@
 """ 位置编码 """
 import torch
 
+__author__ = "Wang Qi"
 
 class PositionEncoder:
     def __init__(self, seq_size, word_vec):

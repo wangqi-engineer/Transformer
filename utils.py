@@ -134,10 +134,10 @@ class DeviceMonitor:
 
         self.log.info("=" * 60)
 
-    def display_gpu_memory(self):
+    def display_gpu_memory(self, cur_step, total_step, epoch_i, epoch):
         if torch.cuda.is_available():
-            self.log.info('=' * 60)
             self.log.info('[GPU Memory Usage]')
+            self.log.info(f'[STEP] step: {cur_step}/{total_step}, epoch: {epoch_i}/{epoch}')
 
             gpus = GPUtil.getGPUs()
             for gpu in gpus:

@@ -13,6 +13,8 @@ from tqdm import tqdm
 from logger import TransformerLogger
 from utils import Tokenizer, ModelLoader
 
+__author__ = "Wang Qi"
+
 log = logging.getLogger(__name__)
 
 

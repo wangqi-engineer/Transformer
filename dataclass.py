@@ -4,6 +4,8 @@ from typing import Any
 
 import torch
 
+__author__ = "Wang Qi"
+
 @dataclass
 class TrainingStatics:
     """ 训练的指标数据 """

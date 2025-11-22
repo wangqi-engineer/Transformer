@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from logging import Logger
 
+__author__ = "Wang Qi"
 
 class TransformerLogger(Logger):
     def __init__(self, name, level=logging.INFO, file=None):

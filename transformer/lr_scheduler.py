@@ -2,6 +2,7 @@
 import numpy as np
 from torch.amp import GradScaler
 
+__author__ = "Wang Qi"
 
 class LRScheduler:
     def __init__(self, optimizer, warmup_steps, model_size):

@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from transformer.model_constants import SELF_ATTENTION_TYPE, CROSS_ATTENTION_TYPE, MASKED_ATTENTION_TYPE
 
+__author__ = "Wang Qi"
 
 class Attention(nn.Module):
     def __init__(self, word_vec, model_size, dropout, attention_type=SELF_ATTENTION_TYPE):

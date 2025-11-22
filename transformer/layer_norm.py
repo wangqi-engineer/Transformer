@@ -3,6 +3,8 @@
 import torch
 import torch.nn as nn
 
+__author__ = "Wang Qi"
+
 class LayerNorm(nn.Module):
     def __init__(self, word_vec, eps=1e-5):
         """

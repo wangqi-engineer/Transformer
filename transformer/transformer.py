@@ -5,6 +5,7 @@ import torch.nn as nn
 from transformer.layers import EncoderLayer, DecoderLayer
 from transformer.pos_encoder import PositionEncoder
 
+__author__ = "Wang Qi"
 
 class Transformer(nn.Module):
     def __init__(self, layer_num, head_num, word_vec, d_ff, src_vocab_size, trg_vocab_size, max_seq_size, src_pad_idx, trg_pad_idx, dropout):

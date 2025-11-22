@@ -15,6 +15,7 @@ from logger import TransformerLogger
 
 log = logging.getLogger(__name__)
 
+__author__ = "Wang Qi"
 
 class Vocabulary:
     def __init__(self, examples, max_seq_len=100):
