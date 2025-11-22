@@ -310,8 +310,9 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             forward_hooks.append(forward_hook_handle)
             backward_hooks.append(backward_hook_handle)
 
+    for name, param in training_tools_epoch.transformer.named_modules():
         if any(x in name for x in ['w_q', 'w_k', 'w_v']):
-            hook = module.register_hook(create_adaptive_hook(name))
+            hook = param.register_hook(create_adaptive_hook(name))
             hooks.append(hook)
 
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
