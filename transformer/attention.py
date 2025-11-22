@@ -19,9 +19,9 @@ class Attention(nn.Module):
         super().__init__()
         self.word_vec = word_vec
         self.model_size = model_size
-        self.w_q = nn.Linear(word_vec, model_size)
-        self.w_k = nn.Linear(word_vec, model_size)
-        self.w_v = nn.Linear(word_vec, model_size)
+        self.w_q = nn.Linear(word_vec, model_size, bias=False)
+        self.w_k = nn.Linear(word_vec, model_size, bias=False)
+        self.w_v = nn.Linear(word_vec, model_size, bias=False)
         self.attention_type = attention_type
         self.dropout = nn.Dropout(dropout)
 
