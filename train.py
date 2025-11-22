@@ -330,6 +330,11 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
         if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
+            # 检测当前设备gpu显存的使用情况
+            training_tools_epoch.device_monitor.display_gpu_memory(step, total_step, training_statics_epoch.epoch_i,
+                                                             training_tools_epoch.opt.epoch)
+
+            # 检查梯度变化情况
             lr = training_tools_epoch.scheduler.get_lr()
             log.info(f"[GRAD CHECKPOINT] epoch {training_statics_epoch.epoch_i}, step {step}, loss={loss.item():.4f}, "
                      f"total grad norm={total_norm:.6f}, lr={lr}")
@@ -373,10 +378,6 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools, epoch_finish=False):
     # 每训练若干步或者一轮训练结束后记录指标并保存模型
-    if epoch_finish or step != total_step and step % training_tools.opt.gpu_monitor_steps == 0:
-        # 检测当前设备gpu显存的使用情况
-        training_tools.device_monitor.display_gpu_memory(step, total_step, training_statics.epoch_i, training_tools.opt.epoch)
-
     if epoch_finish or step != total_step and step % training_tools.opt.model_eval_steps == 0:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
