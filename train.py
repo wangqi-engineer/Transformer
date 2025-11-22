@@ -116,7 +116,7 @@ def train():
     log.info(f'[Data Size] Valid data size: {len(valid_data)}')
     log.info('=' * 60)
     global total_step
-    total_step = len(train_data) / opt.batch_size
+    total_step = int(len(train_data) / opt.batch_size)
 
     # 开始tokenizer训练数据
     log.debug(f'Start to tokenize train data. Please waiting soon...')
