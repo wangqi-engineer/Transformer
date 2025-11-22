@@ -2,7 +2,6 @@
 import torch.nn as nn
 
 from transformer.model_constants import SELF_ATTENTION_TYPE, MASKED_ATTENTION_TYPE, CROSS_ATTENTION_TYPE
-from transformer.layer_norm import LayerNorm
 from transformer.heads_attention import MultiHeadAttention
 
 __author__ = "Wang Qi"
@@ -26,7 +25,7 @@ class EncoderLayer(nn.Module):
             nn.ReLU(),
             nn.Linear(d_ff, word_vec)
         )
-        self.norms = nn.ModuleList([LayerNorm(word_vec) for _ in range(2)])
+        self.norms = nn.ModuleList([nn.LayerNorm(word_vec) for _ in range(2)])
         self.dropouts = nn.ModuleList(nn.Dropout(dropout) for _ in range(2))
 
 
@@ -77,7 +76,7 @@ class DecoderLayer(nn.Module):
             nn.ReLU(),
             nn.Linear(d_ff, word_vec)
         )
-        self.norms = nn.ModuleList([LayerNorm(word_vec) for _ in range(3)])
+        self.norms = nn.ModuleList([nn.LayerNorm(word_vec) for _ in range(3)])
         self.dropouts = nn.ModuleList([nn.Dropout(dropout) for _ in range(3)])
 
     def forward(self, input_enc, input_dec, src_pad_mask, trg_pad_mask):

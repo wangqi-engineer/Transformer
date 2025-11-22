@@ -347,6 +347,9 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
                     if status != "NORMAL":
                         log.warning(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
 
+                    if status == "VANISHED":
+                        raise ValueError(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
+
         gradient_history.append({
             'step': step,
             'epoch': training_statics_epoch.epoch_i,
