@@ -18,7 +18,7 @@ from torch.amp import autocast
 
 from dataclass import TrainingStatics, TrainingTools
 from logger import TransformerLogger
-from transformer.lr_scheduler import LRScheduler
+from transformer.lr_scheduler import SchedulerOptim
 from utils import Tokenizer, ModelLoader, DeviceMonitor, ModelSizeEval
 from constants import PAD_WORD
 from transformer.transformer import Transformer
@@ -186,7 +186,7 @@ def train():
     else:
         log.warning('NO PYTORCH 2.0 COMPILATION OPTIMIZATION')
     optimizer = optim.Adam(transformer.parameters(), lr=opt.lr, betas=(0.9, 0.98), eps=1e-9)
-    scheduler = LRScheduler(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec)
+    scheduler = SchedulerOptim(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec)
 
     # 模型大小
     model_status = ModelSizeEval(transformer).calculate_model_size()
@@ -253,7 +253,11 @@ def train():
 
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
     desc = '    - (Training)    '
+    gradient_history = []
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
+        global step
+        step += 1
+
         # 记录训练前的模型参数，检查模型是否更新
         initial_params = [p.clone() for p in training_tools_epoch.transformer.parameters()]
 
@@ -272,6 +276,25 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             log.debug('Start backward computing...')
             # 统计未 padding 的词
             cur_correct, loss, valid_words_num = cal_loss(training_tools_epoch.opt, pred, trg)
+
+        # 计算梯度统计
+        grad_norms = {}
+        total_norm = 0
+
+        for name, param in training_tools_epoch.transformer.named_parameters():
+            if param.grad is not None:
+                grad_norm = param.grad.norm().item()
+                grad_norms[name] = grad_norm
+                total_norm += grad_norm
+
+        gradient_history.append({
+            'step': step,
+            'epoch': training_statics_epoch.epoch_i,
+            'loss': loss.item(),
+            'total_grad_norm': total_norm,
+            'layer_grads': grad_norms
+        })
+
         training_tools_epoch.scheduler.backward(loss)
 
         # 梯度裁剪
@@ -285,11 +308,19 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         for i, (init_param, current_param) in enumerate(zip(initial_params, training_tools_epoch.transformer.parameters())):
             if not torch.allclose(init_param, current_param):
                 param_changed = True
-                log.info(f"Model param {i} has been updated")
+                log.debug(f"Model param {i} has been updated")
                 break
 
+        # 检查当前梯度
         if not param_changed:
-            log.warning(f"Model param does not been updated!")
+            log.warning(f"Model param has not been updated!")
+
+        if step % 10 == 0:
+            log.info(f"Epoch {training_statics_epoch.epoch_i}, Step {step}: Loss={loss.item():.4f}, Total Grad Norm={total_norm:.6f}")
+
+        # 检测梯度消失
+        if total_norm < 1e-10:
+            log.warning(f"Gradient vanishing occurs in epoch {training_statics_epoch.epoch_i}, step {step}")
 
         # 指标统计
         training_statics_epoch.running_loss += loss.item()
@@ -301,9 +332,6 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         train_acc = cur_correct / valid_words_num
         train_ppl = np.exp(min(train_loss, 100))
         train_duration = time.time() - train_step_start
-
-        global step
-        step += 1
 
         training_statics = TrainingStatics(
             train_acc=train_acc,
