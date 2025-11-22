@@ -277,6 +277,14 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             # 统计未 padding 的词
             cur_correct, loss, valid_words_num = cal_loss(training_tools_epoch.opt, pred, trg)
 
+        training_tools_epoch.scheduler.backward(loss)
+
+        # 在混合精度中unscale梯度以便正确统计和裁剪
+        training_tools_epoch.scheduler.scaler.unscale_(training_tools_epoch.scheduler.optimizer)
+
+        # 添加梯度裁剪
+        torch.nn.utils.clip_grad_norm_(training_tools_epoch.transformer.parameters(), max_norm=5.0)
+
         # 计算梯度统计
         grad_norms = {}
         total_norm = 0
@@ -295,25 +303,31 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             'layer_grads': grad_norms
         })
 
-        training_tools_epoch.scheduler.backward(loss)
-
-        # 梯度裁剪
-        torch.nn.utils.clip_grad_norm_(training_tools_epoch.transformer.parameters(), max_norm=5)
-
         training_tools_epoch.scheduler.update_and_step()
         log.debug('Finish backward computing...')
 
+        # 确保CUDA操作完成
+        if training_tools_epoch.device.type == 'cuda':
+            torch.cuda.synchronize()
+
         # 检查参数是否变化
         param_changed = False
-        for i, (init_param, current_param) in enumerate(zip(initial_params, training_tools_epoch.transformer.parameters())):
-            if not torch.allclose(init_param, current_param):
+        max_change = 0.0
+        for i, (init_param, current_param) in enumerate(
+                zip(initial_params, training_tools_epoch.transformer.parameters())):
+            change = (current_param - init_param).abs().max().item()
+            max_change = max(max_change, change)
+
+            # 使用更宽松的容差，特别是对于混合精度
+            if change > 1e-8:  # 只要变化大于1e-8就认为更新了
                 param_changed = True
-                log.debug(f"Model param {i} has been updated")
+                log.debug(f"Model param {i} updated, max change: {change:.2e}")
                 break
 
-        # 检查当前梯度
         if not param_changed:
-            log.warning(f"Model param has not been updated!")
+            log.warning(f"Model param has not been updated! Max change: {max_change:.2e}")
+        else:
+            log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
         if step % 10 == 0:
             log.info(f"Epoch {training_statics_epoch.epoch_i}, Step {step}: Loss={loss.item():.4f}, Total Grad Norm={total_norm:.6f}")
