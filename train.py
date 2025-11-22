@@ -273,15 +273,43 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         return hook
 
+    def create_adaptive_hook(self, param_name):
+        """创建自适应梯度hook"""
+
+        def hook(grad):
+            if grad is None:
+                return grad
+
+            grad_norm = grad.norm().item()
+
+            # 动态计算放大倍数
+            if grad_norm < self.min_grad_norm:
+                boost_factor = min(self.max_boost, self.min_grad_norm / (grad_norm + 1e-12))
+                new_grad = grad * boost_factor
+                new_norm = new_grad.norm().item()
+
+                log.info(f"{param_name}: grad {grad_norm:.2e} -> {new_norm:.2e} (magnify {boost_factor:.1f} times)")
+                return new_grad
+
+            return grad
+
+        return hook
+
     # 一次性注册所有hook
     forward_hooks = []
     backward_hooks = []
+    hooks = []
+
     for name, module in training_tools_epoch.transformer.named_modules():
         if len(list(module.children())) == 0:  # 只注册叶子模块
             forward_hook_handle = module.register_forward_hook(forward_hook(name))
             backward_hook_handle = module.register_full_backward_hook(backward_hook(name))
             forward_hooks.append(forward_hook_handle)
             backward_hooks.append(backward_hook_handle)
+
+        if any(x in name for x in ['w_q', 'w_k', 'w_v']):
+            hook = module.register_hook(create_adaptive_hook(name))
+            hooks.append(hook)
 
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
         global step

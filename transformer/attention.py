@@ -71,9 +71,8 @@ class Attention(nn.Module):
         """专用权重初始化"""
         # Q、K矩阵使用较小的初始化（防止softmax饱和）
         # 较小的初始化可以防止点积过大导致softmax梯度消失
-        gain_qk = 0.5  # 比默认1.0小
+        gain_qk = 0.5
 
-        # V矩阵可以使用正常初始化
         gain_v = 1.0
 
         # 初始化Q、K矩阵
