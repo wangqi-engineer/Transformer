@@ -26,7 +26,7 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # 专用初始化
-        # self._initialize_weights()
+        self._initialize_weights()
 
     def forward(self, x, pad_mask, input_dec=None):
         """

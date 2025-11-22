@@ -16,7 +16,18 @@ class LayerNorm(nn.Module):
         super().__init__()
         self.model_size = word_vec
         self.eps = eps
-        self.linear = nn.Linear(word_vec, word_vec)
+        # 标准LayerNorm使用可学习的缩放和平移参数
+        self.weight = nn.Parameter(torch.ones(word_vec))  # 缩放参数 γ
+        self.bias = nn.Parameter(torch.zeros(word_vec))  # 平移参数 β
+
+        # 专用初始化
+        self._initialize_parameters()
+
+    def _initialize_parameters(self):
+        """专用参数初始化"""
+        # LayerNorm的权重通常初始化为1，偏置初始化为0
+        nn.init.ones_(self.weight)
+        nn.init.zeros_(self.bias)
 
     def forward(self, x):
         """
