@@ -23,8 +23,10 @@ class Attention(nn.Module):
         self.w_k = nn.Linear(word_vec, model_size)
         self.w_v = nn.Linear(word_vec, model_size)
         self.attention_type = attention_type
-
         self.dropout = nn.Dropout(dropout)
+
+        # 专用初始化
+        # self._initialize_weights()
 
     def forward(self, x, pad_mask, input_dec=None):
         """
@@ -64,3 +66,28 @@ class Attention(nn.Module):
         # ==================== 计算输出矩阵 ====================
         output = scores @ v
         return output
+
+    def _initialize_weights(self):
+        """专用权重初始化"""
+        # Q、K矩阵使用较小的初始化（防止softmax饱和）
+        # 较小的初始化可以防止点积过大导致softmax梯度消失
+        gain_qk = 0.5  # 比默认1.0小
+
+        # V矩阵可以使用正常初始化
+        gain_v = 1.0
+
+        # 初始化Q、K矩阵
+        nn.init.xavier_uniform_(self.w_q.weight, gain=gain_qk)
+        nn.init.xavier_uniform_(self.w_k.weight, gain=gain_qk)
+        nn.init.xavier_uniform_(self.w_v.weight, gain=gain_v)
+
+        # 偏置初始化为0
+        if self.w_q.bias is not None:
+            nn.init.zeros_(self.w_q.bias)
+        if self.w_k.bias is not None:
+            nn.init.zeros_(self.w_k.bias)
+        if self.w_v.bias is not None:
+            nn.init.zeros_(self.w_v.bias)
+
+        # 验证初始化
+        self._validate_initialization()

@@ -26,7 +26,8 @@ class EncoderLayer(nn.Module):
             nn.ReLU(),
             nn.Linear(d_ff, word_vec)
         )
-        self.norms = nn.ModuleList([LayerNorm(word_vec) for _ in range(2)])
+        # self.norms = nn.ModuleList([LayerNorm(word_vec) for _ in range(2)])
+        self.norms = nn.ModuleList([nn.LayerNorm(word_vec) for _ in range(2)])
         self.dropouts = nn.ModuleList(nn.Dropout(dropout) for _ in range(2))
 
 

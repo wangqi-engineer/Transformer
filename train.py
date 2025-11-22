@@ -333,6 +333,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         # 分析每层
         if step % training_tools_epoch.opt.monitor_steps == 0:
+            log.info('[GARD ANALISE]')
             log.info("LAYER NAME | FORWARD RANGE | BACKWARD GRAD | STATUS")
             log.info("-" * 60)
 
@@ -423,7 +424,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         # )
         #
         # record_status(training_statics, training_tools, epoch_finish=False)
-    return (training_statics_epoch.correct, training_statics_epoch.running_loss, training_statics_epoch.total_words)
+    return training_statics_epoch.correct, training_statics_epoch.running_loss, training_statics_epoch.total_words
 
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools, epoch_finish=False):
