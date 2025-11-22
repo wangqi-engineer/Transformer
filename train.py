@@ -222,7 +222,7 @@ def train():
             transformer=transformer
         )
 
-        correct, running_loss, step, total_words = train_epoch(training_statics_epoch, training_tools_epoch)
+        correct, running_loss, total_words = train_epoch(training_statics_epoch, training_tools_epoch)
 
         train_acc = correct / total_words
         train_loss = running_loss / step
@@ -397,11 +397,9 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         # 指标统计
         training_statics_epoch.running_loss += loss.item()
-        training_statics_epoch.step += 1
         training_statics_epoch.correct += cur_correct
         training_statics_epoch.total_words += valid_words_num
 
-        # todo: 如果这里需要删除，那么opt参数解析多余的参数也删除掉
         # train_loss = loss.item()
         # train_acc = cur_correct / valid_words_num
         # train_ppl = np.exp(min(train_loss, 100))
@@ -425,8 +423,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         # )
         #
         # record_status(training_statics, training_tools, epoch_finish=False)
-    return (training_statics_epoch.correct, training_statics_epoch.running_loss,
-            training_statics_epoch.step, training_statics_epoch.total_words)
+    return (training_statics_epoch.correct, training_statics_epoch.running_loss, training_statics_epoch.total_words)
 
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools, epoch_finish=False):

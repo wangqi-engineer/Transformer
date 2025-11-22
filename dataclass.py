@@ -16,7 +16,6 @@ class TrainingStatics:
     epoch_i: int = 1
     correct: int = 0
     running_loss: float = 0
-    step: int = 0
     total_words: int = 0
 
 
