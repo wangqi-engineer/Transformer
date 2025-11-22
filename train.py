@@ -229,7 +229,7 @@ def train():
         train_loss = running_loss / step
         train_ppl = np.exp(min(train_loss, 100))
         train_duration = time.time() - start_train_time
-        log.info(f'[Training Epoch] epoch {epoch_i}/{opt.epoch} has been finished')
+        log.info(f'[TRAINING EPOCH] epoch {epoch_i}/{opt.epoch} has been finished')
 
         training_statics = TrainingStatics(
             train_acc=train_acc,
@@ -254,6 +254,9 @@ def train():
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
     desc = '    - (Training)    '
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
+        # 记录训练前的模型参数，检查模型是否更新
+        initial_params = [p.clone() for p in training_tools_epoch.transformer.parameters()]
+
         train_step_start = time.time()
         # 梯度清零
         training_tools_epoch.scheduler.zero_grad()
@@ -276,6 +279,18 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         training_tools_epoch.scheduler.update_and_step()
         log.debug('Finish backward computing...')
+
+        # 检查参数是否变化
+        param_changed = False
+        for i, (init_param, current_param) in enumerate(zip(initial_params, training_tools_epoch.transformer.parameters())):
+            if not torch.allclose(init_param, current_param):
+                param_changed = True
+                log.info(f"Model param {i} has been updated")
+                break
+
+        if not param_changed:
+            log.warning(f"Model param does not been updated!")
+
         # 指标统计
         training_statics_epoch.running_loss += loss.item()
         training_statics_epoch.step += 1
@@ -313,11 +328,12 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools):
-    if step % training_tools.opt.gpu_monitor_steps == 0:
+    # 每训练若干步或者一轮训练结束后记录指标并保存模型
+    if step == total_step or step % training_tools.opt.gpu_monitor_steps == 0:
         # 检测当前设备gpu显存的使用情况
         training_tools.device_monitor.display_gpu_memory(step, total_step, training_statics.epoch_i, training_tools.opt.epoch)
 
-    if step % training_tools.opt.model_eval_steps == 0:
+    if step == total_step or step % training_tools.opt.model_eval_steps == 0:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         training_tools.opt.lr = lr
@@ -331,7 +347,7 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
                                                                            lr, training_tools.opt, training_tools.transformer,
                                                                            training_tools.valid_dataloader)
 
-        if step % training_tools.opt.model_save_steps == 0:
+        if step == total_step or step % training_tools.opt.model_save_steps == 0:
             # ==================== 根据不同的保存策略保存模型 ====================
             # 模型参数，epoch_i和opt都需要保存
             checkpoint = {'params': training_tools.transformer.state_dict(),
