@@ -329,7 +329,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         else:
             log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
-        if step % training_tools_epoch.opt.model_eval_steps == 0:
+        if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
             log.info(f"Epoch {training_statics_epoch.epoch_i}, Step {step}: Loss={loss.item():.4f}, Total Grad Norm={total_norm:.6f}")
 
         # 检测梯度消失
