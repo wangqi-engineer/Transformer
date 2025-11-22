@@ -83,11 +83,11 @@ def train():
         log.error(err_msg)
         raise ValueError(err_msg)
 
-    if opt.model_save_steps % opt.model_eval_steps != 0:
-        # 保存步数需要为验证步数的整数倍，不然保存会失败
-        err_msg = f'model_save_steps:{opt.model_save_steps} must be an integer multiple of model_eval_steps: {opt.model_eval_steps}'
-        log.error(err_msg)
-        raise ValueError(err_msg)
+    # if opt.model_save_steps % opt.model_eval_steps != 0:
+    #     # 保存步数需要为验证步数的整数倍，不然保存会失败
+    #     err_msg = f'model_save_steps:{opt.model_save_steps} must be an integer multiple of model_eval_steps: {opt.model_eval_steps}'
+    #     log.error(err_msg)
+    #     raise ValueError(err_msg)
 
     # ==================== 初始化训练监控类 ====================
     device_monitor = DeviceMonitor(log)
