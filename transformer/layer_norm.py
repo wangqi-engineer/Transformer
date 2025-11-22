@@ -37,7 +37,7 @@ class LayerNorm(nn.Module):
         :return: 归一化输出
         """
         x_mean = torch.mean(x, dim=-1, keepdim=True)
-        x_var = torch.var(x, dim=-1, keepdim=True)
+        x_var = torch.var(x, dim=-1, unbiased=False, keepdim=True)
         x_norm = (x - x_mean) / torch.sqrt(x_var + self.eps)
-        output = self.linear(x_norm)
+        output = x_norm * self.weight + self.bias
         return output
