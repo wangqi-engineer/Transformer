@@ -66,7 +66,7 @@ class DataPreprocessor:
         # 获取数据文件夹下的唯一一个csv文件
         data_dir_path = Path(self.data_dir)
         csv_files = list(data_dir_path.glob('*.csv'))
-        if len(csv_files) < 0:
+        if len(csv_files) < 1:
             raise ValueError(f'data dir path: {data_dir_path} does not contain csv file')
 
         # 读取csv文件

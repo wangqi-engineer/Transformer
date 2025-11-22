@@ -1,6 +1,6 @@
 """ Transformer模型学习率调整器 """
 import numpy as np
-from torch.cuda.amp import GradScaler
+from torch.amp import GradScaler
 
 
 class LRScheduler:
@@ -10,7 +10,7 @@ class LRScheduler:
         self.model_size = model_size
         self._cur_step = 0
         # 开启混合精度
-        self.scaler = GradScaler()
+        self.scaler = GradScaler('cuda')
 
     def zero_grad(self):
         self.optimizer.zero_grad()

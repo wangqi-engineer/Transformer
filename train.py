@@ -32,8 +32,11 @@ torch.set_float32_matmul_precision('high')
 # 设置最小验证集损失值
 min_valid_loss = 1e9
 
+# 设置全局训练步数
+total_step = 0
+
 def performance_str(tag, epoch_i, epochs, loss, ppl, accuracy, lr, duration):
-    return (f'[{tag}] epoch: {epoch_i}/{epochs}, loss: {loss:.4f}, ppl: {ppl:.4f}, accuracy: {100*accuracy:.2f}%, '
+    return (f'[{tag}] total step: {total_step}, epoch: {epoch_i}/{epochs}, loss: {loss:.4f}, ppl: {ppl:.4f}, accuracy: {100*accuracy:.2f}%, '
             f'lr: {lr:.4f}, duration: {duration:.2f}s')
 
 
@@ -73,8 +76,15 @@ def train():
 
     if opt.model_dir and not os.path.exists(opt.model_dir):
         # 如果要训练一个已经加载一半的模型但是路径不存在，则报错
-        log.error(f'param model_dir:{opt.model_dir} does not exist')
-        raise ValueError(f'param model_dir:{opt.model_dir} does not exist')
+        err_msg = f'param model_dir:{opt.model_dir} does not exist'
+        log.error(err_msg)
+        raise ValueError(err_msg)
+
+    if opt.model_save_steps % opt.model_eval_steps != 0:
+        # 保存步数需要为验证步数的整数倍，不然保存会失败
+        err_msg = f'model_save_steps:{opt.model_save_steps} must be an integer multiple of model_eval_steps: {opt.model_eval_steps}'
+        log.error(err_msg)
+        raise ValueError(err_msg)
 
     # ==================== 初始化训练监控类 ====================
     device_monitor = DeviceMonitor(log)
@@ -180,7 +190,6 @@ def train():
     log.info('=' * 60)
 
     # 进入epoch开始迭代训练
-    total_step = 0
     for epoch in range(opt.epoch):
         # ==================== 开始在训练集上训练 ====================
         transformer.train()
@@ -196,7 +205,6 @@ def train():
             epoch_i=epoch_i,
             running_loss=running_loss,
             step=step,
-            total_step=total_step,
             total_words=total_words
         )
 
@@ -215,7 +223,6 @@ def train():
         train_acc = correct / total_words
         train_loss = running_loss / step
         train_ppl = np.exp(min(train_loss, 100))
-        total_step += step
         train_duration = time.time() - start_train_time
         log.info(f'[Training Epoch] epoch {epoch_i}/{opt.epoch} has been finished')
 
@@ -225,7 +232,6 @@ def train():
             train_loss=train_loss,
             train_ppl=train_ppl,
             epoch_i=epoch_i,
-            total_step=total_step
         )
 
         training_tools = TrainingTools(
@@ -276,13 +282,15 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         train_ppl = np.exp(min(train_loss, 100))
         train_duration = time.time() - train_step_start
 
+        global total_step
+        total_step += 1
+
         training_statics = TrainingStatics(
             train_acc=train_acc,
             train_duration=train_duration,
             train_loss=train_loss,
             train_ppl=train_ppl,
             epoch_i=training_statics_epoch.epoch_i,
-            total_step=training_statics_epoch.total_step
         )
 
         training_tools = TrainingTools(
@@ -300,11 +308,11 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools):
-    if training_statics.total_step % training_tools.opt.gpu_monitor_steps == 0:
+    if total_step % training_tools.opt.gpu_monitor_steps == 0:
         # 检测当前设备gpu显存的使用情况
         training_tools.device_monitor.display_gpu_memory()
 
-    if training_statics.total_step % training_tools.opt.model_eval_steps == 0:
+    if total_step % training_tools.opt.model_eval_steps == 0:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         training_tools.opt.lr = lr
@@ -318,11 +326,12 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
                                                                            lr, training_tools.opt, training_tools.transformer,
                                                                            training_tools.valid_dataloader)
 
-        if training_statics.total_step % training_tools.opt.model_save_steps == 0:
+        if total_step % training_tools.opt.model_save_steps == 0:
             # ==================== 根据不同的保存策略保存模型 ====================
             # 模型参数，epoch_i和opt都需要保存
             checkpoint = {'params': training_tools.transformer.state_dict(),
                           'epoch': training_statics.epoch_i,
+                          'step': total_step,
                           'settings': training_tools.opt}
             if training_tools.opt.save_mode == 'all':
                 # 保存每个周期生成的checkpoint，
@@ -346,17 +355,17 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
         tb_writer = SummaryWriter(log_dir=os.path.join(training_tools.opt.output_dir, 'tensorboard'))
         tb_writer.add_scalars('accuracy',
                               {'train': 100 * training_statics.train_acc, 'valid': 100 * valid_acc},
-                              training_statics.epoch_i)
+                              total_step)
         tb_writer.add_scalars('loss',
                               {'train': training_statics.train_loss, 'valid': valid_loss},
-                              training_statics.epoch_i)
+                              total_step)
         tb_writer.add_scalars('loss',
                               {'train': training_statics.train_loss, 'valid': valid_loss},
-                              training_statics.epoch_i)
+                              total_step)
         tb_writer.add_scalars('ppl',
                               {'train': training_statics.train_ppl, 'valid': valid_ppl},
-                              training_statics.epoch_i)
-        tb_writer.add_scalar('lr', lr, training_statics.epoch_i)
+                              total_step)
+        tb_writer.add_scalar('lr', lr, total_step)
 
 
 def valid_epoch(device, epoch_i, lr, opt, transformer, valid_dataloader):
