@@ -253,30 +253,66 @@ def train():
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
     desc = '    - (Training)    '
     gradient_history = []
+    # 【重要】如果每一步训练都要在验证集统计结果需要将transformer.train()放在for循环里面
     training_tools_epoch.transformer.train()
+
+    # 记录每层前向输出
+    activations = {}
+    gradient_norms = {}
+
+    def forward_hook(name):
+        def hook(module, input, output):
+            activations[name] = output.detach()
+
+        return hook
+
+    def backward_hook(name):
+        def hook(module, grad_input, grad_output):
+            if grad_output[0] is not None:
+                gradient_norms[name] = grad_output[0].norm().item()
+
+        return hook
+
+    # 一次性注册所有hook
+    forward_hooks = []
+    backward_hooks = []
+    for name, module in training_tools_epoch.transformer.named_modules():
+        if len(list(module.children())) == 0:  # 只注册叶子模块
+            forward_hook_handle = module.register_forward_hook(forward_hook(name))
+            backward_hook_handle = module.register_full_backward_hook(backward_hook(name))
+            forward_hooks.append(forward_hook_handle)
+            backward_hooks.append(backward_hook_handle)
+
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
         global step
         step += 1
 
         # 记录训练前的模型参数，检查模型是否更新
         initial_params = [p.clone() for p in training_tools_epoch.transformer.parameters()]
-
         train_step_start = time.time()
+
+        # 清空上一轮的统计
+        activations.clear()
+        gradient_norms.clear()
+
         # 梯度清零
         training_tools_epoch.scheduler.zero_grad()
+
         # 前向计算
         log.debug('Start forward computing...')
         src = src.to(training_tools_epoch.device)
         trg = trg.to(training_tools_epoch.device)
+
         # 开启混合精度
         with autocast('cuda'):
             pred = training_tools_epoch.transformer(src, trg)
             log.debug('Finish forward computing...')
-            # 反向传播
-            log.debug('Start backward computing...')
+
             # 统计未 padding 的词
             cur_correct, loss, valid_words_num = cal_loss(training_tools_epoch.opt, pred, trg)
 
+        # 反向传播
+        log.debug('Start backward computing...')
         training_tools_epoch.scheduler.backward(loss)
 
         # 在混合精度中unscale梯度以便正确统计和裁剪
@@ -294,6 +330,19 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
                 grad_norm = param.grad.norm().item()
                 grad_norms[name] = grad_norm
                 total_norm += grad_norm
+
+        # 分析每层
+        if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
+            log.info("LAYER NAME | FORWARD RANGE | BACKWARD GRAD | STATUS")
+            log.info("-" * 60)
+
+            for name, module in training_tools_epoch.transformer.named_modules():
+                if name in activations and name in gradient_norms:
+                    act = activations[name]
+                    grad_norm = gradient_norms[name]
+
+                    status = "NORMAL" if grad_norm > 1e-6 else "SMALL" if grad_norm > 1e-9 else "VANISHED"
+                    log.info(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
 
         gradient_history.append({
             'step': step,
