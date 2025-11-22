@@ -329,19 +329,20 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         else:
             log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
+        lr = training_tools_epoch.scheduler.get_lr()
         if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
             # 检测当前设备gpu显存的使用情况
             training_tools_epoch.device_monitor.display_gpu_memory(step, total_step, training_statics_epoch.epoch_i,
                                                              training_tools_epoch.opt.epoch)
 
             # 检查梯度变化情况
-            lr = training_tools_epoch.scheduler.get_lr()
             log.info(f"[GRAD CHECKPOINT] epoch {training_statics_epoch.epoch_i}, step {step}, loss={loss.item():.4f}, "
                      f"total grad norm={total_norm:.6f}, lr={lr}")
 
         # 检测梯度消失
         if total_norm < 1e-10:
-            log.warning(f"[GRADIENT VANISHING] Gradient {total_norm:.6f} vanishing occurs in epoch {training_statics_epoch.epoch_i}, step {step}")
+            log.warning(f"[GRADIENT VANISHING] Gradient {total_norm:.6f} vanishing occurs in epoch {training_statics_epoch.epoch_i}, "
+                        f"epoch {training_statics_epoch.epoch_i}, step {step}, lr={lr}")
 
         # 指标统计
         training_statics_epoch.running_loss += loss.item()
