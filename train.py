@@ -273,7 +273,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         return hook
 
-    def create_adaptive_hook(self, param_name):
+    def create_adaptive_hook(param_name):
         """创建自适应梯度hook"""
 
         def hook(grad):
@@ -282,9 +282,12 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
             grad_norm = grad.norm().item()
 
+            min_grad_norm = 1e-8
+            max_boost = 1000
+
             # 动态计算放大倍数
-            if grad_norm < self.min_grad_norm:
-                boost_factor = min(self.max_boost, self.min_grad_norm / (grad_norm + 1e-12))
+            if grad_norm < min_grad_norm:
+                boost_factor = min(max_boost, min_grad_norm / (grad_norm + 1e-12))
                 new_grad = grad * boost_factor
                 new_norm = new_grad.norm().item()
 
