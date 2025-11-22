@@ -48,9 +48,9 @@ def train():
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', '--batch_size', type=int, default=64, help='每次从DataLoader中拿到的批数据大小')
     parser.add_argument('-epoch', type=int, default=10, help='训练轮数')
-    parser.add_argument('-model_eval_steps', type=int, default=500, help='每隔多少步评估一次模型')
-    parser.add_argument('-model_save_steps', type=int, default=1000, help='每隔多少步保存一次模型')
-    parser.add_argument('-gpu_monitor_steps', type=int, default=100, help='每隔多少步检测一次显存大小')
+    parser.add_argument('-monitor_steps', type=int, default=100, help='每隔多少步检测一次显存/梯度流等信息')
+    # parser.add_argument('-model_eval_steps', type=int, default=500, help='每隔多少步评估一次模型')
+    # parser.add_argument('-model_save_steps', type=int, default=1000, help='每隔多少步保存一次模型')
 
     parser.add_argument('-output_dir', default='outputs/train', help='输出路径')
     parser.add_argument('-data_pkl', default='outputs/preprocess/preprocess_data.pkl', help='预处理阶段保存的词表、设置参数和数据集信息')
@@ -332,7 +332,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
                 total_norm += grad_norm
 
         # 分析每层
-        if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
+        if step % training_tools_epoch.opt.monitor_steps == 0:
             log.info("LAYER NAME | FORWARD RANGE | BACKWARD GRAD | STATUS")
             log.info("-" * 60)
 
@@ -342,7 +342,9 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
                     grad_norm = gradient_norms[name]
 
                     status = "NORMAL" if grad_norm > 1e-6 else "SMALL" if grad_norm > 1e-9 else "VANISHED"
-                    log.info(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
+                    log.debug(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
+                    if status != "NORMAL":
+                        log.warning(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
 
         gradient_history.append({
             'step': step,
@@ -379,7 +381,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
         lr = training_tools_epoch.scheduler.get_lr()
-        if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
+        if step % training_tools_epoch.opt.monitor_steps == 0:
             # 检测当前设备gpu显存的使用情况
             training_tools_epoch.device_monitor.display_gpu_memory(step, total_step, training_statics_epoch.epoch_i,
                                                              training_tools_epoch.opt.epoch)
@@ -429,7 +431,8 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools, epoch_finish=False):
     # 每训练若干步或者一轮训练结束后记录指标并保存模型
-    if epoch_finish or step != total_step and step % training_tools.opt.model_eval_steps == 0:
+    # if epoch_finish or step != total_step and step % training_tools.opt.model_eval_steps == 0:
+    if epoch_finish:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         training_tools.opt.lr = lr
@@ -443,22 +446,22 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
                                                                            lr, training_tools.opt, training_tools.transformer,
                                                                            training_tools.valid_dataloader)
 
-        if epoch_finish or step != total_step and step % training_tools.opt.model_save_steps == 0:
-            # ==================== 根据不同的保存策略保存模型 ====================
-            # 模型参数，epoch_i和opt都需要保存
-            checkpoint = {'params': training_tools.transformer.state_dict(),
-                          'epoch': training_statics.epoch_i,
-                          'step': step,
-                          'settings': training_tools.opt}
-            if training_tools.opt.save_mode == 'all':
-                # 保存每个周期生成的checkpoint，
-                torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, f'model_acc_{valid_acc * 100:3.3f}.chkpt'))
-            else:
-                # 保存验证集损失值最低对应的模型
-                global min_valid_loss
-                if valid_loss < min_valid_loss:
-                    min_valid_loss = valid_loss
-                    torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, 'model.chkpt'))
+        # if epoch_finish or step != total_step and step % training_tools.opt.model_save_steps == 0:
+        # ==================== 根据不同的保存策略保存模型 ====================
+        # 模型参数，epoch_i和opt都需要保存
+        checkpoint = {'params': training_tools.transformer.state_dict(),
+                      'epoch': training_statics.epoch_i,
+                      'step': step,
+                      'settings': training_tools.opt}
+        if training_tools.opt.save_mode == 'all':
+            # 保存每个周期生成的checkpoint，
+            torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, f'model_acc_{valid_acc * 100:3.3f}.chkpt'))
+        else:
+            # 保存验证集损失值最低对应的模型
+            global min_valid_loss
+            if valid_loss < min_valid_loss:
+                min_valid_loss = valid_loss
+                torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, 'model.chkpt'))
 
         # ==================== 统计指标写入文件 ====================
         # 分别将统计指标写入到训练日志和验证日志中，方便观察训练结果
