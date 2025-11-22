@@ -88,6 +88,3 @@ class Attention(nn.Module):
             nn.init.zeros_(self.w_k.bias)
         if self.w_v.bias is not None:
             nn.init.zeros_(self.w_v.bias)
-
-        # 验证初始化
-        self._validate_initialization()
