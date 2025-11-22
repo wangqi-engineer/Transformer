@@ -76,9 +76,13 @@ class Attention(nn.Module):
         gain_v = 0.8
 
         # 初始化Q、K矩阵
-        nn.init.xavier_uniform_(self.w_q.weight, gain=gain_qk)
-        nn.init.xavier_uniform_(self.w_k.weight, gain=gain_qk)
-        nn.init.xavier_uniform_(self.w_v.weight, gain=gain_v)
+        # nn.init.xavier_uniform_(self.w_q.weight, gain=gain_qk)
+        # nn.init.xavier_uniform_(self.w_k.weight, gain=gain_qk)
+        # nn.init.xavier_uniform_(self.w_v.weight, gain=gain_v)
+
+        nn.init.normal_(self.w_q.weight, mean=0.0, std=0.001)
+        nn.init.normal_(self.w_k.weight, mean=0.0, std=0.001)
+        nn.init.normal_(self.w_v.weight, mean=0.0, std=0.001)
 
         # 偏置初始化为0
         if self.w_q.bias is not None:
