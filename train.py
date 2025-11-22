@@ -248,7 +248,7 @@ def train():
             device_monitor=device_monitor
         )
 
-        record_status(training_statics, training_tools)
+        record_status(training_statics, training_tools, epoch_finish=True)
 
 
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
@@ -322,18 +322,18 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             device_monitor=training_tools_epoch.device_monitor
         )
 
-        record_status(training_statics, training_tools)
+        record_status(training_statics, training_tools, epoch_finish=False)
     return (training_statics_epoch.correct, training_statics_epoch.running_loss,
             training_statics_epoch.step, training_statics_epoch.total_words)
 
 
-def record_status(training_statics: TrainingStatics, training_tools: TrainingTools):
+def record_status(training_statics: TrainingStatics, training_tools: TrainingTools, epoch_finish=False):
     # 每训练若干步或者一轮训练结束后记录指标并保存模型
-    if step == total_step or step % training_tools.opt.gpu_monitor_steps == 0:
+    if epoch_finish or step != total_step and step % training_tools.opt.gpu_monitor_steps == 0:
         # 检测当前设备gpu显存的使用情况
         training_tools.device_monitor.display_gpu_memory(step, total_step, training_statics.epoch_i, training_tools.opt.epoch)
 
-    if step == total_step or step % training_tools.opt.model_eval_steps == 0:
+    if epoch_finish or step != total_step and step % training_tools.opt.model_eval_steps == 0:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         training_tools.opt.lr = lr
@@ -347,7 +347,7 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
                                                                            lr, training_tools.opt, training_tools.transformer,
                                                                            training_tools.valid_dataloader)
 
-        if step == total_step or step % training_tools.opt.model_save_steps == 0:
+        if epoch_finish or step != total_step and step % training_tools.opt.model_save_steps == 0:
             # ==================== 根据不同的保存策略保存模型 ====================
             # 模型参数，epoch_i和opt都需要保存
             checkpoint = {'params': training_tools.transformer.state_dict(),
