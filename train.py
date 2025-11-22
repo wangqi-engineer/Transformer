@@ -329,12 +329,12 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         else:
             log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
-        if step % 10 == 0:
+        if step % training_tools_epoch.opt.model_eval_steps == 0:
             log.info(f"Epoch {training_statics_epoch.epoch_i}, Step {step}: Loss={loss.item():.4f}, Total Grad Norm={total_norm:.6f}")
 
         # 检测梯度消失
         if total_norm < 1e-10:
-            log.warning(f"Gradient vanishing occurs in epoch {training_statics_epoch.epoch_i}, step {step}")
+            log.warning(f"Gradient {total_norm:.6f} vanishing occurs in epoch {training_statics_epoch.epoch_i}, step {step}")
 
         # 指标统计
         training_statics_epoch.running_loss += loss.item()
