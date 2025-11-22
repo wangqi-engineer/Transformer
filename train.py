@@ -197,7 +197,6 @@ def train():
     # 进入epoch开始迭代训练
     for epoch in range(opt.epoch):
         # ==================== 开始在训练集上训练 ====================
-        transformer.train()
         start_train_time = time.time()
         epoch_i = epoch + 1
         running_loss = 0.0
@@ -254,6 +253,7 @@ def train():
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
     desc = '    - (Training)    '
     gradient_history = []
+    training_tools_epoch.transformer.train()
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
         global step
         step += 1
@@ -330,11 +330,13 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             log.debug(f"Parameters updated successfully, max change: {max_change:.2e}")
 
         if step % training_tools_epoch.opt.gpu_monitor_steps == 0:
-            log.info(f"Epoch {training_statics_epoch.epoch_i}, Step {step}: Loss={loss.item():.4f}, Total Grad Norm={total_norm:.6f}")
+            lr = training_tools_epoch.scheduler.get_lr()
+            log.info(f"[GRAD CHECKPOINT] epoch {training_statics_epoch.epoch_i}, step {step}, loss={loss.item():.4f}, "
+                     f"total grad norm={total_norm:.6f}, lr={lr}")
 
         # 检测梯度消失
         if total_norm < 1e-10:
-            log.warning(f"Gradient {total_norm:.6f} vanishing occurs in epoch {training_statics_epoch.epoch_i}, step {step}")
+            log.warning(f"[GRADIENT VANISHING] Gradient {total_norm:.6f} vanishing occurs in epoch {training_statics_epoch.epoch_i}, step {step}")
 
         # 指标统计
         training_statics_epoch.running_loss += loss.item()
@@ -342,29 +344,29 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         training_statics_epoch.correct += cur_correct
         training_statics_epoch.total_words += valid_words_num
 
-        train_loss = loss.item()
-        train_acc = cur_correct / valid_words_num
-        train_ppl = np.exp(min(train_loss, 100))
-        train_duration = time.time() - train_step_start
-
-        training_statics = TrainingStatics(
-            train_acc=train_acc,
-            train_duration=train_duration,
-            train_loss=train_loss,
-            train_ppl=train_ppl,
-            epoch_i=training_statics_epoch.epoch_i,
-        )
-
-        training_tools = TrainingTools(
-            device=training_tools_epoch.device,
-            scheduler=training_tools_epoch.scheduler,
-            opt=training_tools_epoch.opt,
-            transformer=training_tools_epoch.transformer,
-            valid_dataloader=training_tools_epoch.valid_dataloader,
-            device_monitor=training_tools_epoch.device_monitor
-        )
-
-        record_status(training_statics, training_tools, epoch_finish=False)
+        # train_loss = loss.item()
+        # train_acc = cur_correct / valid_words_num
+        # train_ppl = np.exp(min(train_loss, 100))
+        # train_duration = time.time() - train_step_start
+        #
+        # training_statics = TrainingStatics(
+        #     train_acc=train_acc,
+        #     train_duration=train_duration,
+        #     train_loss=train_loss,
+        #     train_ppl=train_ppl,
+        #     epoch_i=training_statics_epoch.epoch_i,
+        # )
+        #
+        # training_tools = TrainingTools(
+        #     device=training_tools_epoch.device,
+        #     scheduler=training_tools_epoch.scheduler,
+        #     opt=training_tools_epoch.opt,
+        #     transformer=training_tools_epoch.transformer,
+        #     valid_dataloader=training_tools_epoch.valid_dataloader,
+        #     device_monitor=training_tools_epoch.device_monitor
+        # )
+        #
+        # record_status(training_statics, training_tools, epoch_finish=False)
     return (training_statics_epoch.correct, training_statics_epoch.running_loss,
             training_statics_epoch.step, training_statics_epoch.total_words)
 
