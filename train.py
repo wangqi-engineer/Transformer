@@ -395,11 +395,11 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         log.debug('Start backward computing...')
         training_tools_epoch.scheduler.backward(loss)
 
-        # 在混合精度中unscale梯度以便正确统计和裁剪
-        training_tools_epoch.scheduler.scaler.unscale_(training_tools_epoch.scheduler.optimizer)
-
-        # 添加梯度裁剪
-        torch.nn.utils.clip_grad_norm_(training_tools_epoch.transformer.parameters(), max_norm=5.0)
+        # # 在混合精度中unscale梯度以便正确统计和裁剪
+        # training_tools_epoch.scheduler.scaler.unscale_(training_tools_epoch.scheduler.optimizer)
+        #
+        # # 添加梯度裁剪
+        # torch.nn.utils.clip_grad_norm_(training_tools_epoch.transformer.parameters(), max_norm=5.0)
 
         # 计算梯度统计
         grad_norms = {}
