@@ -26,7 +26,10 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # 专用初始化
-        # self._initialize_weights()
+        self._initialize_weights()
+
+        # 梯度保护
+        self._setup_gradient_protection()
 
     def forward(self, x, pad_mask, input_dec=None):
         """
@@ -67,27 +70,36 @@ class Attention(nn.Module):
         output = scores @ v
         return output
 
-    # def _initialize_weights(self):
-    #     """专用权重初始化"""
-    #     # Q、K矩阵使用较小的初始化（防止softmax饱和）
-    #     # 较小的初始化可以防止点积过大导致softmax梯度消失
-    #     gain_qk = 0.1
-    #
-    #     gain_v = 0.8
-    #
-    #     # 初始化Q、K矩阵
-    #     # nn.init.xavier_uniform_(self.w_q.weight, gain=gain_qk)
-    #     # nn.init.xavier_uniform_(self.w_k.weight, gain=gain_qk)
-    #     # nn.init.xavier_uniform_(self.w_v.weight, gain=gain_v)
-    #
-    #     nn.init.normal_(self.w_q.weight, mean=0.0, std=0.001)
-    #     nn.init.normal_(self.w_k.weight, mean=0.0, std=0.001)
-    #     nn.init.normal_(self.w_v.weight, mean=0.0, std=0.001)
-    #
-    #     # 偏置初始化为0
-    #     if self.w_q.bias is not None:
-    #         nn.init.zeros_(self.w_q.bias)
-    #     if self.w_k.bias is not None:
-    #         nn.init.zeros_(self.w_k.bias)
-    #     if self.w_v.bias is not None:
-    #         nn.init.zeros_(self.w_v.bias)
+    def _initialize_weights(self):
+        """专用权重初始化"""
+        # Q、K矩阵：极小的初始化防止softmax饱和
+        nn.init.normal_(self.w_q.weight, mean=0.0, std=0.001)
+        nn.init.normal_(self.w_k.weight, mean=0.0, std=0.001)
+        # V矩阵：中等初始化
+        nn.init.normal_(self.w_v.weight, mean=0.0, std=0.01)
+
+
+    def _setup_gradient_protection(self):
+        """设置梯度保护"""
+        # 为Q矩阵注册梯度保护hook
+        self.w_q.weight.register_hook(self._create_gradient_guard("w_q"))
+        self.w_k.weight.register_hook(self._create_gradient_guard("w_k"))
+        self.w_v.weight.register_hook(self._create_gradient_guard("w_v"))
+
+
+    def _create_gradient_guard(self, param_name):
+        """创建梯度保护hook"""
+
+        def guard(grad):
+            if grad is None:
+                return grad
+
+            grad_norm = grad.norm().item()
+            if grad_norm < 1e-12:
+                # 梯度消失，进行放大
+                new_grad = grad * 1000.0
+                print(f" grad guard: {param_name} {grad_norm:.2e} -> {new_grad.norm().item():.2e}")
+                return new_grad
+            return grad
+
+        return guard

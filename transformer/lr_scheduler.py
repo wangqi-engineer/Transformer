@@ -29,11 +29,11 @@ class SchedulerOptim:
             param_group['lr'] = lr
 
     def update_and_step(self):
-        self._cur_step += 1
-        self._update_lr()
         # 开启混合精度计算
         self.scaler.step(self.optimizer)
         self.scaler.update()
+        self._cur_step += 1
+        self._update_lr()
 
     def get_lr(self):
         return self.optimizer.param_groups[0]['lr']

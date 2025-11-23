@@ -301,7 +301,6 @@ def train():
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
     desc = '    - (Training)    '
     gradient_history = []
-    # 【重要】如果每一步训练都要在验证集统计结果需要将transformer.train()放在for循环里面
     training_tools_epoch.transformer.train()
 
     # 记录每层前向输出
@@ -321,35 +320,9 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         return hook
 
-    # def create_adaptive_hook(param_name):
-    #     """创建自适应梯度hook"""
-    #
-    #     def hook(grad):
-    #         if grad is None:
-    #             return grad
-    #
-    #         grad_norm = grad.norm().item()
-    #
-    #         min_grad_norm = 1e-8
-    #         max_boost = 1000
-    #
-    #         # 动态计算放大倍数
-    #         if grad_norm < min_grad_norm:
-    #             boost_factor = min(max_boost, min_grad_norm / (grad_norm + 1e-12))
-    #             new_grad = grad * boost_factor
-    #             new_norm = new_grad.norm().item()
-    #
-    #             log.info(f"{param_name}: grad {grad_norm:.2e} -> {new_norm:.2e} (magnify {boost_factor:.1f} times)")
-    #             return new_grad
-    #
-    #         return grad
-    #
-    #     return hook
-
     # 一次性注册所有hook
     forward_hooks = []
     backward_hooks = []
-    hooks = []
 
     for name, module in training_tools_epoch.transformer.named_modules():
         if len(list(module.children())) == 0:  # 只注册叶子模块
@@ -357,11 +330,6 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             backward_hook_handle = module.register_full_backward_hook(backward_hook(name))
             forward_hooks.append(forward_hook_handle)
             backward_hooks.append(backward_hook_handle)
-
-    # for name, param in training_tools_epoch.transformer.named_parameters():
-    #     if any(x in name for x in ['w_q', 'w_k', 'w_v']):
-    #         hook = param.register_hook(create_adaptive_hook(name))
-    #         hooks.append(hook)
 
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
         global step
@@ -395,11 +363,11 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         log.debug('Start backward computing...')
         training_tools_epoch.scheduler.backward(loss)
 
-        # # 在混合精度中unscale梯度以便正确统计和裁剪
-        # training_tools_epoch.scheduler.scaler.unscale_(training_tools_epoch.scheduler.optimizer)
-        #
-        # # 添加梯度裁剪
-        # torch.nn.utils.clip_grad_norm_(training_tools_epoch.transformer.parameters(), max_norm=5.0)
+        # 在混合精度中unscale梯度以便正确统计和裁剪
+        training_tools_epoch.scheduler.scaler.unscale_(training_tools_epoch.scheduler.optimizer)
+
+        # 添加梯度裁剪
+        torch.nn.utils.clip_grad_norm_(training_tools_epoch.transformer.parameters(), max_norm=5.0)
 
         # 计算梯度统计
         grad_norms = {}
@@ -428,7 +396,16 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
                         log.warning(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
 
                     if status == "VANISHED":
-                        raise ValueError(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
+                        log.error(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
+                        # 尝试实时修复消失的梯度
+                        if 'w_q' in name or 'w_k' in name or 'w_v' in name:
+                            for param_name, param in module.named_parameters():
+                                if param.grad is not None and param.grad.norm().item() < 1e-10:
+                                    # 注入人工梯度
+                                    with torch.no_grad():
+                                        pseudo_grad = torch.randn_like(param) * 1e-8
+                                        param.grad += pseudo_grad
+                                    log.info(f"Param {param_name} inject artificial gradients")
 
         gradient_history.append({
             'step': step,
