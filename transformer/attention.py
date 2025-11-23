@@ -26,7 +26,7 @@ class Attention(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # 专用初始化
-        self._initialize_weights()
+        # self._initialize_weights()
 
     def forward(self, x, pad_mask, input_dec=None):
         """
@@ -67,27 +67,27 @@ class Attention(nn.Module):
         output = scores @ v
         return output
 
-    def _initialize_weights(self):
-        """专用权重初始化"""
-        # Q、K矩阵使用较小的初始化（防止softmax饱和）
-        # 较小的初始化可以防止点积过大导致softmax梯度消失
-        gain_qk = 0.1
-
-        gain_v = 0.8
-
-        # 初始化Q、K矩阵
-        # nn.init.xavier_uniform_(self.w_q.weight, gain=gain_qk)
-        # nn.init.xavier_uniform_(self.w_k.weight, gain=gain_qk)
-        # nn.init.xavier_uniform_(self.w_v.weight, gain=gain_v)
-
-        nn.init.normal_(self.w_q.weight, mean=0.0, std=0.001)
-        nn.init.normal_(self.w_k.weight, mean=0.0, std=0.001)
-        nn.init.normal_(self.w_v.weight, mean=0.0, std=0.001)
-
-        # 偏置初始化为0
-        if self.w_q.bias is not None:
-            nn.init.zeros_(self.w_q.bias)
-        if self.w_k.bias is not None:
-            nn.init.zeros_(self.w_k.bias)
-        if self.w_v.bias is not None:
-            nn.init.zeros_(self.w_v.bias)
+    # def _initialize_weights(self):
+    #     """专用权重初始化"""
+    #     # Q、K矩阵使用较小的初始化（防止softmax饱和）
+    #     # 较小的初始化可以防止点积过大导致softmax梯度消失
+    #     gain_qk = 0.1
+    #
+    #     gain_v = 0.8
+    #
+    #     # 初始化Q、K矩阵
+    #     # nn.init.xavier_uniform_(self.w_q.weight, gain=gain_qk)
+    #     # nn.init.xavier_uniform_(self.w_k.weight, gain=gain_qk)
+    #     # nn.init.xavier_uniform_(self.w_v.weight, gain=gain_v)
+    #
+    #     nn.init.normal_(self.w_q.weight, mean=0.0, std=0.001)
+    #     nn.init.normal_(self.w_k.weight, mean=0.0, std=0.001)
+    #     nn.init.normal_(self.w_v.weight, mean=0.0, std=0.001)
+    #
+    #     # 偏置初始化为0
+    #     if self.w_q.bias is not None:
+    #         nn.init.zeros_(self.w_q.bias)
+    #     if self.w_k.bias is not None:
+    #         nn.init.zeros_(self.w_k.bias)
+    #     if self.w_v.bias is not None:
+    #         nn.init.zeros_(self.w_v.bias)

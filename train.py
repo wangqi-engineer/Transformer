@@ -10,6 +10,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+
+import torch.nn as nn
 from spacy.compat import pickle
 from torch.utils.data import TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -194,6 +196,52 @@ def train():
     log.info(f"[Model Size] Trainable model parameters size: {model_status['trainable_M']:.1f}M")
     log.info('=' * 60)
 
+    # 模型初始化
+    for name, module in transformer.named_modules():
+        if isinstance(module, nn.Embedding):
+            # Embedding层：使用较小的初始化
+            nn.init.normal_(module.weight, mean=0.0, std=module.embedding_dim ** -0.5)
+            log.info(f"    初始化Embedding: {name}")
+
+        elif isinstance(module, nn.Linear):
+            # 根据层类型选择不同的初始化策略
+            if 'w_q' in name or 'w_k' in name:
+                # Q、K矩阵：极小的初始化防止softmax饱和
+                nn.init.xavier_uniform_(module.weight, gain=0.1)
+                log.info(f"     Init Q/K: {name} (gain=0.1)")
+
+            elif 'w_v' in name:
+                # V矩阵：中等初始化
+                nn.init.xavier_uniform_(module.weight, gain=0.5)
+                log.info(f"     Init V: {name} (gain=0.5)")
+
+            elif 'output' in name or 'generator' in name or 'projection' in name:
+                # 输出层：较小的初始化
+                nn.init.xavier_uniform_(module.weight, gain=0.3)
+                log.info(f"     Init output: {name} (gain=0.3)")
+
+            elif 'feed_forward' in name or 'ffn' in name:
+                # FFN层：正常初始化
+                if '.0' in name or 'w_1' in name:  # 第一个线性层
+                    nn.init.xavier_uniform_(module.weight, gain=1.0)
+                else:  # 第二个线性层
+                    nn.init.xavier_uniform_(module.weight, gain=0.3)
+                log.info(f"     Init FFN: {name}")
+
+            else:
+                # 其他线性层：安全初始化
+                nn.init.xavier_uniform_(module.weight, gain=0.7)
+                log.info(f"     Init Linear: {name} (gain=0.7)")
+
+            # 偏置初始化
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+        elif isinstance(module, nn.LayerNorm):
+            # LayerNorm：标准初始化
+            nn.init.ones_(module.weight)
+            nn.init.zeros_(module.bias)
+
     # 进入epoch开始迭代训练
     for epoch in range(opt.epoch):
         # ==================== 开始在训练集上训练 ====================
@@ -273,30 +321,30 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
         return hook
 
-    def create_adaptive_hook(param_name):
-        """创建自适应梯度hook"""
-
-        def hook(grad):
-            if grad is None:
-                return grad
-
-            grad_norm = grad.norm().item()
-
-            min_grad_norm = 1e-8
-            max_boost = 1000
-
-            # 动态计算放大倍数
-            if grad_norm < min_grad_norm:
-                boost_factor = min(max_boost, min_grad_norm / (grad_norm + 1e-12))
-                new_grad = grad * boost_factor
-                new_norm = new_grad.norm().item()
-
-                log.info(f"{param_name}: grad {grad_norm:.2e} -> {new_norm:.2e} (magnify {boost_factor:.1f} times)")
-                return new_grad
-
-            return grad
-
-        return hook
+    # def create_adaptive_hook(param_name):
+    #     """创建自适应梯度hook"""
+    #
+    #     def hook(grad):
+    #         if grad is None:
+    #             return grad
+    #
+    #         grad_norm = grad.norm().item()
+    #
+    #         min_grad_norm = 1e-8
+    #         max_boost = 1000
+    #
+    #         # 动态计算放大倍数
+    #         if grad_norm < min_grad_norm:
+    #             boost_factor = min(max_boost, min_grad_norm / (grad_norm + 1e-12))
+    #             new_grad = grad * boost_factor
+    #             new_norm = new_grad.norm().item()
+    #
+    #             log.info(f"{param_name}: grad {grad_norm:.2e} -> {new_norm:.2e} (magnify {boost_factor:.1f} times)")
+    #             return new_grad
+    #
+    #         return grad
+    #
+    #     return hook
 
     # 一次性注册所有hook
     forward_hooks = []
@@ -310,10 +358,10 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             forward_hooks.append(forward_hook_handle)
             backward_hooks.append(backward_hook_handle)
 
-    for name, param in training_tools_epoch.transformer.named_parameters():
-        if any(x in name for x in ['w_q', 'w_k', 'w_v']):
-            hook = param.register_hook(create_adaptive_hook(name))
-            hooks.append(hook)
+    # for name, param in training_tools_epoch.transformer.named_parameters():
+    #     if any(x in name for x in ['w_q', 'w_k', 'w_v']):
+    #         hook = param.register_hook(create_adaptive_hook(name))
+    #         hooks.append(hook)
 
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
         global step
