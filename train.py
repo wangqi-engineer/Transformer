@@ -51,6 +51,9 @@ def train():
     parser.add_argument('-b', '--batch_size', type=int, default=64, help='每次从DataLoader中拿到的批数据大小')
     parser.add_argument('-epoch', type=int, default=10, help='训练轮数')
     parser.add_argument('-monitor_steps', type=int, default=100, help='每隔多少步检测一次显存/梯度流等信息')
+    # 如果在win上训练关闭编译优化和混合精度
+    parser.add_argument('-on_win', action='store_true', help='在win还是linux训练')
+    # 用于大规模参数训练
     # parser.add_argument('-model_eval_steps', type=int, default=500, help='每隔多少步评估一次模型')
     # parser.add_argument('-model_save_steps', type=int, default=1000, help='每隔多少步保存一次模型')
 
@@ -181,12 +184,16 @@ def train():
         transformer = ModelLoader(checkpoint).load_exist_model()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    log.info(f'[Train Device] Model train device: {device}')
     transformer.to(device)
-    # 使用pytorch2.0编译优化加速训练
-    if hasattr(torch, 'compile'):
-        transformer = torch.compile(transformer)
+    if not opt.on_win:
+        # linux系统使用pytorch2.0编译优化加速训练，win系统由于triton缺少及可能存在的.cache文件文件并发问题，因此关闭编译优化
+        if hasattr(torch, 'compile'):
+            transformer = torch.compile(transformer)
+        else:
+            log.warning('[Model Compile] No pytorch compilation optimization on linux')
     else:
-        log.warning('NO PYTORCH 2.0 COMPILATION OPTIMIZATION')
+        log.warning('[Model Compile] No pytorch compilation optimization on windows')
     optimizer = optim.Adam(transformer.parameters(), betas=(0.9, 0.98), eps=1e-9)
     scheduler = SchedulerOptim(optimizer, warmup_steps=opt.warmup_steps, model_size=opt.word_vec, lr_mul=opt.lr_mul)
 
