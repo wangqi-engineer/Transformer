@@ -401,7 +401,7 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
 
                     status = "NORMAL" if grad_norm > 1e-6 else "SMALL" if grad_norm > 1e-9 else "VANISHED"
                     log.debug(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
-                    if status != "NORMAL":
+                    if status == "SMALL":
                         log.warning(f"{name:30} | [{act.min():.4f}, {act.max():.4f}] | {grad_norm:.2e} | {status}")
 
                     if status == "VANISHED":
