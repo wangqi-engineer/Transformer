@@ -22,7 +22,7 @@ class EncoderLayer(nn.Module):
         self.self_attentions = MultiHeadAttention(head_num, word_vec, dropout=dropout, attention_type=SELF_ATTENTION_TYPE)
         self.feed_forward = nn.Sequential(
             nn.Linear(word_vec, d_ff),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(d_ff, word_vec)
         )
         self.norms = nn.ModuleList([nn.LayerNorm(word_vec) for _ in range(2)])

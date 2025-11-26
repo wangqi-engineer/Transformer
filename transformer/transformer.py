@@ -29,10 +29,7 @@ class Transformer(nn.Module):
         self.encoder = nn.ModuleList([EncoderLayer(head_num, word_vec, d_ff, dropout) for _ in range(layer_num)])
         self.decoder_embedding = nn.Embedding(trg_vocab_size, word_vec, padding_idx=trg_pad_idx)
         self.decoder = nn.ModuleList([DecoderLayer(head_num, word_vec, d_ff, dropout) for _ in range(layer_num)])
-        self.output = nn.Sequential(
-            nn.Linear(word_vec, trg_vocab_size),
-            nn.Softmax(dim=-1)
-        )
+        self.output = nn.Linear(word_vec, trg_vocab_size)
         self.src_dropout = nn.Dropout(dropout)
         self.trg_dropout = nn.Dropout(dropout)
 
