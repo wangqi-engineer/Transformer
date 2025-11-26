@@ -25,12 +25,6 @@ class Attention(nn.Module):
         self.attention_type = attention_type
         self.dropout = nn.Dropout(dropout)
 
-        # 专用初始化
-        self._initialize_weights()
-
-        # 梯度保护
-        self._setup_gradient_protection()
-
     def forward(self, x, pad_mask, input_dec=None):
         """
         attention注意力机制计算
@@ -69,37 +63,3 @@ class Attention(nn.Module):
         # ==================== 计算输出矩阵 ====================
         output = scores @ v
         return output
-
-    def _initialize_weights(self):
-        """专用权重初始化"""
-        # Q、K矩阵：极小的初始化防止softmax饱和
-        nn.init.normal_(self.w_q.weight, mean=0.0, std=0.001)
-        nn.init.normal_(self.w_k.weight, mean=0.0, std=0.001)
-        # V矩阵：中等初始化
-        nn.init.normal_(self.w_v.weight, mean=0.0, std=0.01)
-
-
-    def _setup_gradient_protection(self):
-        """设置梯度保护"""
-        # 为Q矩阵注册梯度保护hook
-        self.w_q.weight.register_hook(self._create_gradient_guard("w_q"))
-        self.w_k.weight.register_hook(self._create_gradient_guard("w_k"))
-        self.w_v.weight.register_hook(self._create_gradient_guard("w_v"))
-
-
-    def _create_gradient_guard(self, param_name):
-        """创建梯度保护hook"""
-
-        def guard(grad):
-            if grad is None:
-                return grad
-
-            grad_norm = grad.norm().item()
-            if grad_norm < 1e-12:
-                # 梯度消失，进行放大
-                new_grad = grad * 1000.0
-                print(f" grad guard: {param_name} {grad_norm:.2e} -> {new_grad.norm().item():.2e}")
-                return new_grad
-            return grad
-
-        return guard
