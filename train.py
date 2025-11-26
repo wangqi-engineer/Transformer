@@ -310,7 +310,6 @@ def train():
 def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: TrainingTools):
     desc = '    - (Training)    '
     gradient_history = []
-    training_tools_epoch.transformer.train()
 
     # 记录每层前向输出
     activations = {}
@@ -341,6 +340,8 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
             backward_hooks.append(backward_hook_handle)
 
     for src, trg in tqdm(training_tools_epoch.train_dataloader, desc=desc, mininterval=2, leave=False):
+        training_tools_epoch.transformer.train()
+
         global step
         step += 1
 
