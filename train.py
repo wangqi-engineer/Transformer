@@ -53,9 +53,11 @@ def train():
     parser.add_argument('-monitor_steps', type=int, default=100, help='每隔多少步检测一次显存/梯度流等信息')
     # 如果在win上训练关闭编译优化和混合精度
     parser.add_argument('-on_win', action='store_true', help='在win还是linux训练')
-    # 用于大规模参数训练
-    # parser.add_argument('-model_eval_steps', type=int, default=500, help='每隔多少步评估一次模型')
-    # parser.add_argument('-model_save_steps', type=int, default=1000, help='每隔多少步保存一次模型')
+
+    # 用于大数据量训练，millions_train_data为True时model_eval_steps和model_save_steps才有意义，否则无意义
+    parser.add_argument('-millions_train_data', action='store_true', help='样本数据量是否达到百万')
+    parser.add_argument('-model_eval_steps', type=int, default=500, help='每隔多少步评估一次模型')
+    parser.add_argument('-model_save_steps', type=int, default=1000, help='每隔多少步保存一次模型')
 
     parser.add_argument('-output_dir', default='outputs/train', help='输出路径')
     parser.add_argument('-data_pkl', default='outputs/preprocess/preprocess_data.pkl', help='预处理阶段保存的词表、设置参数和数据集信息')
@@ -88,11 +90,11 @@ def train():
         log.error(err_msg)
         raise ValueError(err_msg)
 
-    # if opt.model_save_steps % opt.model_eval_steps != 0:
-    #     # 保存步数需要为验证步数的整数倍，不然保存会失败
-    #     err_msg = f'model_save_steps:{opt.model_save_steps} must be an integer multiple of model_eval_steps: {opt.model_eval_steps}'
-    #     log.error(err_msg)
-    #     raise ValueError(err_msg)
+    if opt.millions_train_data and opt.model_save_steps % opt.model_eval_steps != 0:
+        # 保存步数需要为验证步数的整数倍，不然保存会失败
+        err_msg = f'model_save_steps:{opt.model_save_steps} must be an integer multiple of model_eval_steps: {opt.model_eval_steps}'
+        log.error(err_msg)
+        raise ValueError(err_msg)
 
     # ==================== 初始化训练监控类 ====================
     device_monitor = DeviceMonitor(log)
@@ -468,36 +470,42 @@ def train_epoch(training_statics_epoch: TrainingStatics, training_tools_epoch: T
         training_statics_epoch.correct += cur_correct
         training_statics_epoch.total_words += valid_words_num
 
-        # train_loss = loss.item()
-        # train_acc = cur_correct / valid_words_num
-        # train_ppl = np.exp(min(train_loss, 100))
-        # train_duration = time.time() - train_step_start
-        #
-        # training_statics = TrainingStatics(
-        #     train_acc=train_acc,
-        #     train_duration=train_duration,
-        #     train_loss=train_loss,
-        #     train_ppl=train_ppl,
-        #     epoch_i=training_statics_epoch.epoch_i,
-        # )
-        #
-        # training_tools = TrainingTools(
-        #     device=training_tools_epoch.device,
-        #     scheduler=training_tools_epoch.scheduler,
-        #     opt=training_tools_epoch.opt,
-        #     transformer=training_tools_epoch.transformer,
-        #     valid_dataloader=training_tools_epoch.valid_dataloader,
-        #     device_monitor=training_tools_epoch.device_monitor
-        # )
-        #
-        # record_status(training_statics, training_tools, epoch_finish=False)
+        # 百万数据量时一个epoch需要很多步，因此不等到epoch结束提前观察模型训练效果并保存，降低监控粒度
+        train_loss = loss.item()
+        train_acc = cur_correct / valid_words_num
+        train_ppl = np.exp(min(train_loss, 100))
+        train_duration = time.time() - train_step_start
+
+        training_statics = TrainingStatics(
+            train_acc=train_acc,
+            train_duration=train_duration,
+            train_loss=train_loss,
+            train_ppl=train_ppl,
+            epoch_i=training_statics_epoch.epoch_i,
+        )
+
+        training_tools = TrainingTools(
+            device=training_tools_epoch.device,
+            scheduler=training_tools_epoch.scheduler,
+            opt=training_tools_epoch.opt,
+            transformer=training_tools_epoch.transformer,
+            valid_dataloader=training_tools_epoch.valid_dataloader,
+            device_monitor=training_tools_epoch.device_monitor
+        )
+
+        record_status(training_statics, training_tools, epoch_finish=False)
+
     return training_statics_epoch.correct, training_statics_epoch.running_loss, training_statics_epoch.total_words
 
 
 def record_status(training_statics: TrainingStatics, training_tools: TrainingTools, epoch_finish=False):
-    # 每训练若干步或者一轮训练结束后记录指标并保存模型
-    # if epoch_finish or step != total_step and step % training_tools.opt.model_eval_steps == 0:
-    if epoch_finish:
+    if not training_tools.opt.millions_train_data:
+        pref_monitor_condition = False
+        save_condition = False
+    else:
+        pref_monitor_condition = step != total_step and step % training_tools.opt.model_eval_steps == 0
+        save_condition = step != total_step and step % training_tools.opt.model_save_steps == 0
+    if epoch_finish or pref_monitor_condition:
         lr = training_tools.scheduler.get_lr()
         # 将当前学习率记录到settings中，方便继续学习训练该模型
         training_tools.opt.lr = lr
@@ -511,22 +519,22 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
                                                                            lr, training_tools.opt, training_tools.transformer,
                                                                            training_tools.valid_dataloader)
 
-        # if epoch_finish or step != total_step and step % training_tools.opt.model_save_steps == 0:
-        # ==================== 根据不同的保存策略保存模型 ====================
-        # 模型参数，epoch_i和opt都需要保存
-        checkpoint = {'params': training_tools.transformer.state_dict(),
-                      'epoch': training_statics.epoch_i,
-                      'step': step,
-                      'settings': training_tools.opt}
-        if training_tools.opt.save_mode == 'all':
-            # 保存每个周期生成的checkpoint，
-            torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, f'model_acc_{valid_acc * 100:3.3f}.chkpt'))
-        else:
-            # 保存验证集损失值最低对应的模型
-            global min_valid_loss
-            if valid_loss < min_valid_loss:
-                min_valid_loss = valid_loss
-                torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, 'model.chkpt'))
+        if epoch_finish or save_condition:
+            # ==================== 根据不同的保存策略保存模型 ====================
+            # 模型参数，epoch_i和opt都需要保存
+            checkpoint = {'params': training_tools.transformer.state_dict(),
+                          'epoch': training_statics.epoch_i,
+                          'step': step,
+                          'settings': training_tools.opt}
+            if training_tools.opt.save_mode == 'all':
+                # 保存每个周期生成的checkpoint，
+                torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, f'model_acc_{valid_acc * 100:3.3f}.chkpt'))
+            else:
+                # 保存验证集损失值最低对应的模型
+                global min_valid_loss
+                if valid_loss < min_valid_loss:
+                    min_valid_loss = valid_loss
+                    torch.save(checkpoint, os.path.join(training_tools.opt.output_dir, 'model.chkpt'))
 
         # ==================== 统计指标写入文件 ====================
         # 分别将统计指标写入到训练日志和验证日志中，方便观察训练结果
