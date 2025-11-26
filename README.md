@@ -47,5 +47,6 @@ python translate.py -b 128 -model_dir outputs/train/model.chkpt -output_dir outp
 - 2W数据集在5轮训练之后准确率可以达到 74%，训练耗时7min
 ---
 # 下一步计划
+  - 增加数据集数量，在百万规模级数据下训练模型的实际效果
   - 使用BPE分词器或者WordPiece分词器优化，而非简单选择词汇表并编码
   - 使用束采样或者温度+top p采样优化翻译效果
