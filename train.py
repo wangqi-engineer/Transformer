@@ -538,19 +538,20 @@ def record_status(training_statics: TrainingStatics, training_tools: TrainingToo
 
         # ==================== tensorboard对训练过程可视化 ====================
         tb_writer = SummaryWriter(log_dir=os.path.join(training_tools.opt.output_dir, 'tensorboard'))
+        steps = (training_statics.epoch_i - 1) * total_step + step
         tb_writer.add_scalars('accuracy',
                               {'train': 100 * training_statics.train_acc, 'valid': 100 * valid_acc},
-                              step)
+                              steps)
         tb_writer.add_scalars('loss',
                               {'train': training_statics.train_loss, 'valid': valid_loss},
-                              step)
+                              steps)
         tb_writer.add_scalars('loss',
                               {'train': training_statics.train_loss, 'valid': valid_loss},
-                              step)
+                              steps)
         tb_writer.add_scalars('ppl',
                               {'train': training_statics.train_ppl, 'valid': valid_ppl},
-                              step)
-        tb_writer.add_scalar('lr', lr, step)
+                              steps)
+        tb_writer.add_scalar('lr', lr, steps)
 
 
 def valid_epoch(device, epoch_i, lr, opt, transformer, valid_dataloader):
