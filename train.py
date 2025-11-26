@@ -71,7 +71,7 @@ def train():
     parser.add_argument('-warmup_steps', type=int, default=4000, help='预热步数')
     parser.add_argument('-lr_mul', type=float, default=2.0, help='学习率伸缩因子')
 
-    parser.add_argument('-save_mode', choices=['best', 'all'], default='best', help='保存模型方式；全量保存还是最有保存')
+    parser.add_argument('-save_mode', choices=['best', 'all'], default='best', help='保存模型方式；全量保存还是最优保存')
     parser.add_argument('-no_label_smooth', action='store_true', help='是否设置标签平滑')
 
     opt = parser.parse_args()
@@ -210,7 +210,7 @@ def train():
         if isinstance(module, nn.Embedding):
             # Embedding层：使用较小的初始化
             nn.init.normal_(module.weight, mean=0.0, std=module.embedding_dim ** -0.5)
-            log.info(f"    初始化Embedding: {name}")
+            log.info(f"     Init Embedding: {name}")
 
         elif isinstance(module, nn.Linear):
             # 根据层类型选择不同的初始化策略
